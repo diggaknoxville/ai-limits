@@ -949,63 +949,55 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setBackgroundResource(R.drawable.card_background);
-            int p = dp(16);
+            int p = dp(12);
             card.setPadding(p, p, p, p);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
             );
-            lp.bottomMargin = dp(16);
+            lp.bottomMargin = dp(10);
             card.setLayoutParams(lp);
 
-            // Group Title
+            // Group Header Row (Title left, Count right)
+            LinearLayout groupHeader = new LinearLayout(this);
+            groupHeader.setOrientation(LinearLayout.HORIZONTAL);
+            groupHeader.setGravity(Gravity.CENTER_VERTICAL);
+            groupHeader.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            ));
+
             TextView tvGroupTitle = new TextView(this);
             tvGroupTitle.setText(group.displayName);
             tvGroupTitle.setTextColor(0xFFF8FAFC);
-            tvGroupTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+            tvGroupTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
             tvGroupTitle.setTypeface(null, Typeface.BOLD);
-            card.addView(tvGroupTitle);
+            LinearLayout.LayoutParams gtLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+            tvGroupTitle.setLayoutParams(gtLp);
+            groupHeader.addView(tvGroupTitle);
 
-            // Model chips row
-            List<String> modelNames = group.extractModelNames();
-            if (!modelNames.isEmpty()) {
-                LinearLayout chipsRow = new LinearLayout(this);
-                chipsRow.setOrientation(LinearLayout.HORIZONTAL);
-                chipsRow.setLayoutParams(new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                ));
-                ((LinearLayout.LayoutParams) chipsRow.getLayoutParams()).topMargin = dp(6);
+            TextView tvCount = new TextView(this);
+            tvCount.setText(group.buckets.size() + (group.buckets.size() == 1 ? " Limit" : " Limits"));
+            tvCount.setTextColor(0xFF94A3B8);
+            tvCount.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+            tvCount.setBackgroundResource(R.drawable.badge_background);
+            tvCount.setPadding(dp(6), dp(2), dp(6), dp(2));
+            groupHeader.addView(tvCount);
 
-                for (String modelName : modelNames) {
-                    TextView chip = new TextView(this);
-                    chip.setText(modelName);
-                    chip.setTextColor(0xFF94A3B8);
-                    chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-                    chip.setBackgroundResource(R.drawable.badge_background);
-                    chip.setPadding(dp(8), dp(3), dp(8), dp(3));
+            card.addView(groupHeader);
 
-                    LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.WRAP_CONTENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                    );
-                    chipLp.rightMargin = dp(6);
-                    chipsRow.addView(chip, chipLp);
-                }
-                card.addView(chipsRow);
-            }
-
-            // Description
+            // Compact Subtitle (if available)
             if (group.description != null && !group.description.isEmpty()) {
                 TextView tvDesc = new TextView(this);
-                tvDesc.setText(group.description);
+                String cleanDesc = group.description.replace("\n", " • ");
+                tvDesc.setText(cleanDesc);
                 tvDesc.setTextColor(0xFF64748B);
-                tvDesc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+                tvDesc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
                 LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                descLp.topMargin = dp(8);
+                descLp.topMargin = dp(3);
                 card.addView(tvDesc, descLp);
             }
 
@@ -1014,13 +1006,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 LinearLayout bucketCard = new LinearLayout(this);
                 bucketCard.setOrientation(LinearLayout.VERTICAL);
                 bucketCard.setBackgroundColor(0xFF0F1218);
-                bucketCard.setPadding(dp(12), dp(12), dp(12), dp(12));
+                bucketCard.setPadding(dp(10), dp(8), dp(10), dp(8));
 
                 LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                bLp.topMargin = dp(10);
+                bLp.topMargin = dp(8);
                 bucketCard.setLayoutParams(bLp);
 
                 // Top section: Left Usage Ring, Right info column
@@ -1034,9 +1026,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
                 // 1. LINKS: IMMER USAGE RING
                 final CircularProgressView cp = new CircularProgressView(this);
-                int size = dp(76);
+                int size = dp(64);
                 LinearLayout.LayoutParams cpLp = new LinearLayout.LayoutParams(size, size);
-                cpLp.rightMargin = dp(12);
+                cpLp.rightMargin = dp(10);
                 cp.setLayoutParams(cpLp);
                 cp.setProgress(bucket.remainingFraction);
                 topRow.addView(cp);
@@ -1072,13 +1064,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                     badgeProvider.setTextColor(0xFF38BDF8);
                     badgeProvider.setBackgroundResource(R.drawable.badge_google);
                 }
-                badgeProvider.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                badgeProvider.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                 badgeProvider.setTypeface(null, Typeface.BOLD);
                 LinearLayout.LayoutParams bpLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                bpLp.rightMargin = dp(6);
+                bpLp.rightMargin = dp(5);
                 headerLine.addView(badgeProvider, bpLp);
 
                 // Offensichtliche 5 bzw. W (bzw. T) Kontingentart-Badge
@@ -1097,13 +1089,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                     badgeWindow.setTextColor(0xFF000000);
                     badgeWindow.setBackgroundResource(R.drawable.badge_window_day);
                 }
-                badgeWindow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                badgeWindow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                 badgeWindow.setTypeface(null, Typeface.BOLD);
                 LinearLayout.LayoutParams bwLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                bwLp.rightMargin = dp(6);
+                bwLp.rightMargin = dp(5);
                 headerLine.addView(badgeWindow, bwLp);
 
                 // Title
@@ -1125,9 +1117,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 btnAlarm.setOnClickListener(new AlarmClickListener(this, bucket, btnAlarm));
                 LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
-                        dp(26)
+                        dp(24)
                 );
-                btnLp.leftMargin = dp(6);
+                btnLp.leftMargin = dp(5);
                 headerLine.addView(btnAlarm, btnLp);
 
                 detailsCol.addView(headerLine);
@@ -1136,12 +1128,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 TextView tvModelExp = new TextView(this);
                 tvModelExp.setText(bucket.getModelGroupExplanation());
                 tvModelExp.setTextColor(0xFF94A3B8);
-                tvModelExp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                tvModelExp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                tvModelExp.setSingleLine(true);
+                tvModelExp.setEllipsize(TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams expLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                expLp.topMargin = dp(4);
+                expLp.topMargin = dp(2);
                 detailsCol.addView(tvModelExp, expLp);
 
                 // Live-Nutzung & Session-Anzeige
@@ -1155,11 +1149,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 }
                 tvSession.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                 tvSession.setTypeface(null, Typeface.BOLD);
+                tvSession.setSingleLine(true);
+                tvSession.setEllipsize(TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams sessLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                sessLp.topMargin = dp(3);
+                sessLp.topMargin = dp(2);
                 detailsCol.addView(tvSession, sessLp);
 
                 topRow.addView(detailsCol);
@@ -1172,9 +1168,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 recoveryBar.setProgress(recoveryFraction);
                 LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(7)
+                        dp(6)
                 );
-                recLp.topMargin = dp(10);
+                recLp.topMargin = dp(6);
                 bucketCard.addView(recoveryBar, recLp);
 
                 // Statuszeile unter dem Recovery-Balken
@@ -1185,13 +1181,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                statLp.topMargin = dp(4);
+                statLp.topMargin = dp(3);
                 statusRow.setLayoutParams(statLp);
 
                 final TextView tvCountdown = new TextView(this);
                 tvCountdown.setText(bucket.formatCountdown());
                 tvCountdown.setTextColor(bucket.remainingFraction > 0.5f ? 0xFF10B981 : (bucket.remainingFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444));
-                tvCountdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                tvCountdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                 tvCountdown.setTypeface(null, Typeface.BOLD);
                 LinearLayout.LayoutParams cdLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
                 statusRow.addView(tvCountdown, cdLp);
@@ -1205,7 +1201,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                     tvRecoveryRatio.setText(String.format(Locale.US, "Erholung: %d%%", pct));
                     tvRecoveryRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recoveryFraction));
                 }
-                tvRecoveryRatio.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                tvRecoveryRatio.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                 tvRecoveryRatio.setTypeface(null, Typeface.BOLD);
                 statusRow.addView(tvRecoveryRatio);
 

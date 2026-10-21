@@ -169,6 +169,85 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         }
     }
 
+    private static class BucketClickListener implements View.OnClickListener {
+        private final MainActivity activity;
+        private final QuotaBucket bucket;
+
+        BucketClickListener(MainActivity activity, QuotaBucket bucket) {
+            this.activity = activity;
+            this.bucket = bucket;
+        }
+
+        @Override
+        public void onClick(View v) {
+            activity.showBucketDetailDialog(bucket);
+        }
+    }
+
+    private static class DetailDialogHolder implements View.OnClickListener {
+        private final MainActivity activity;
+        private final AlertDialog dialog;
+        private final QuotaBucket bucket;
+        private final UsageHistoryChartView chart;
+        private final LinearLayout eventsContainer;
+        private final Button btn24h;
+        private final Button btn7d;
+        private final Button btnAlarm;
+
+        DetailDialogHolder(MainActivity activity, AlertDialog dialog, QuotaBucket bucket,
+                           UsageHistoryChartView chart, LinearLayout eventsContainer,
+                           Button btn24h, Button btn7d, Button btnAlarm) {
+            this.activity = activity;
+            this.dialog = dialog;
+            this.bucket = bucket;
+            this.chart = chart;
+            this.eventsContainer = eventsContainer;
+            this.btn24h = btn24h;
+            this.btn7d = btn7d;
+            this.btnAlarm = btnAlarm;
+        }
+
+        void updateRange(int hours) {
+            btn24h.setBackgroundResource(hours == 24 ? R.drawable.button_background : R.drawable.button_secondary_background);
+            btn24h.setTextColor(hours == 24 ? 0xFFFFFFFF : 0xFF94A3B8);
+            btn7d.setBackgroundResource(hours == 168 ? R.drawable.button_background : R.drawable.button_secondary_background);
+            btn7d.setTextColor(hours == 168 ? 0xFFFFFFFF : 0xFF94A3B8);
+
+            long since = System.currentTimeMillis() - (hours * 3600L * 1000L);
+            List<QuotaHistoryManager.HistoryEntry> list = QuotaHistoryManager.getInstance(activity)
+                    .getHistory(bucket.bucketId, since);
+            chart.setData(list);
+            activity.populateHistoryEvents(eventsContainer, list);
+        }
+
+        @Override
+        public void onClick(View v) {
+            int id = v.getId();
+            if (id == R.id.btnDetailClose) {
+                dialog.dismiss();
+            } else if (id == R.id.btnHistory24h) {
+                updateRange(24);
+            } else if (id == R.id.btnHistory7d) {
+                updateRange(168);
+            } else if (id == R.id.btnDetailToggleAlarm) {
+                boolean isArmed = NotificationScheduler.isAlarmScheduled(activity, bucket.bucketId);
+                if (isArmed) {
+                    NotificationScheduler.cancelResetNotification(activity, bucket.bucketId);
+                    btnAlarm.setText("🔔 Alarm aktivieren");
+                    btnAlarm.setBackgroundResource(R.drawable.button_background);
+                    Toast.makeText(activity, "Alarm entfernt", Toast.LENGTH_SHORT).show();
+                } else {
+                    NotificationScheduler.scheduleResetNotification(activity, bucket);
+                    btnAlarm.setText("🔔 Alarm aktiv");
+                    btnAlarm.setBackgroundResource(R.drawable.badge_background);
+                    Toast.makeText(activity, "Alarm aktiviert", Toast.LENGTH_SHORT).show();
+                }
+            } else if (id == R.id.btnDetailCopySummary) {
+                activity.copyBucketDetailsToClipboard(bucket);
+            }
+        }
+    }
+
     private static class SettingsDialogHolder implements View.OnClickListener,
             QuotaApiClient.QuotaCallback, ClaudeDirectClient.ClaudeUsageCallback, GoogleDirectClient.GoogleDirectCallback {
         final MainActivity activity;
@@ -814,6 +893,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         updatePaceAndSavings();
         QuotaWidgetProvider.updateAllWidgets(this);
 
+        List<QuotaBucket> allBuckets = collectAllBuckets();
+        QuotaHistoryManager hist = QuotaHistoryManager.getInstance(this);
+        for (QuotaBucket b : allBuckets) {
+            hist.seedInitialHistoryIfEmpty(b);
+            hist.recordSnapshot(b);
+        }
+
         renderQuotaGroups(combined, googleOverallDescription);
     }
 
@@ -1007,6 +1093,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 bucketCard.setOrientation(LinearLayout.VERTICAL);
                 bucketCard.setBackgroundColor(0xFF0F1218);
                 bucketCard.setPadding(dp(10), dp(8), dp(10), dp(8));
+                bucketCard.setClickable(true);
+                bucketCard.setFocusable(true);
+                bucketCard.setOnClickListener(new BucketClickListener(this, bucket));
 
                 LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1142,10 +1231,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 TextView tvSession = new TextView(this);
                 String sessionDesc = bucket.getActiveSessionDescription();
                 tvSession.setText(sessionDesc);
-                if (sessionDesc.contains("LIVE AKTIV")) {
-                    tvSession.setTextColor(0xFF34D399); // Crisp Emerald
+                if (bucket.isActivelyBurningTokens()) {
+                    tvSession.setTextColor(0xFFFB923C); // Warm Orange/Coral for Active Token Burn
                 } else {
-                    tvSession.setTextColor(0xFF64748B); // Slate Muted
+                    tvSession.setTextColor(0xFF64748B); // Slate Muted for Idle/Standby
                 }
                 tvSession.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                 tvSession.setTypeface(null, Typeface.BOLD);
@@ -1222,6 +1311,197 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         btn.setTextColor(isArmed ? 0xFF10B981 : 0xFF94A3B8);
         btn.setBackgroundResource(isArmed ? R.drawable.badge_background : R.drawable.button_secondary_background);
         btn.setPadding(dp(8), dp(2), dp(8), dp(2));
+    }
+
+    public void showBucketDetailDialog(final QuotaBucket bucket) {
+        if (bucket == null) return;
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        LayoutInflater inflater = getLayoutInflater();
+        View view = inflater.inflate(R.layout.dialog_bucket_detail, null);
+        builder.setView(view);
+
+        final AlertDialog dialog = builder.create();
+
+        // 1. Badges & Title
+        TextView tvProvider = view.findViewById(R.id.tvDetailProviderBadge);
+        String provider = bucket.getProviderType();
+        if ("CLAUDE".equals(provider)) {
+            tvProvider.setText("🟣 Claude Pro");
+            tvProvider.setTextColor(0xFFD8B4FE);
+            tvProvider.setBackgroundResource(R.drawable.badge_claude);
+        } else if ("GOOGLE_IDE".equals(provider)) {
+            tvProvider.setText("🔵 Google IDE");
+            tvProvider.setTextColor(0xFF7DD3FC);
+            tvProvider.setBackgroundResource(R.drawable.badge_google);
+        } else {
+            tvProvider.setText("🔵 Cloud Direkt");
+            tvProvider.setTextColor(0xFF38BDF8);
+            tvProvider.setBackgroundResource(R.drawable.badge_google);
+        }
+
+        TextView tvWindow = view.findViewById(R.id.tvDetailWindowBadge);
+        String wLetter = bucket.getWindowBadgeLetter();
+        if ("5".equals(wLetter)) {
+            tvWindow.setText(" 5h ");
+            tvWindow.setTextColor(0xFF000000);
+            tvWindow.setBackgroundResource(R.drawable.badge_window_5h);
+        } else if ("W".equals(wLetter)) {
+            tvWindow.setText(" W ");
+            tvWindow.setTextColor(0xFFFFFFFF);
+            tvWindow.setBackgroundResource(R.drawable.badge_window_week);
+        } else {
+            tvWindow.setText(" T ");
+            tvWindow.setTextColor(0xFF000000);
+            tvWindow.setBackgroundResource(R.drawable.badge_window_day);
+        }
+
+        TextView tvTitle = view.findViewById(R.id.tvDetailTitle);
+        tvTitle.setText(bucket.displayName);
+
+        // 2. Live Token-Burn Status
+        TextView tvBurnHeadline = view.findViewById(R.id.tvLiveBurnHeadline);
+        TextView tvBurnSubtitle = view.findViewById(R.id.tvLiveBurnSubtitle);
+        boolean isBurning = bucket.isActivelyBurningTokens();
+        if (isBurning) {
+            tvBurnHeadline.setText("🔥 AKTIV: VERBRENNT GERADE TOKENS");
+            tvBurnHeadline.setTextColor(0xFFFB923C);
+        } else {
+            tvBurnHeadline.setText("⚪ IDLE / STANDBY: KEIN TOKEN-VERBRAUCH");
+            tvBurnHeadline.setTextColor(0xFF94A3B8);
+        }
+        tvBurnSubtitle.setText(bucket.getActiveSessionDescription());
+
+        // 3. Circular Ring & Metrics
+        CircularProgressView cpRing = view.findViewById(R.id.cpDetailRing);
+        cpRing.setProgress(bucket.remainingFraction);
+
+        TextView tvCapStatus = view.findViewById(R.id.tvDetailCapacityStatus);
+        int remPct = Math.round(bucket.remainingFraction * 100f);
+        tvCapStatus.setText(remPct + "% frei • " + (100 - remPct) + "% verbraucht");
+
+        TextView tvCountdown = view.findViewById(R.id.tvDetailResetCountdown);
+        tvCountdown.setText(bucket.formatCountdown());
+        tvCountdown.setTextColor(bucket.remainingFraction > 0.5f ? 0xFF10B981 : (bucket.remainingFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444));
+
+        TextView tvExactDate = view.findViewById(R.id.tvDetailExactResetDate);
+        tvExactDate.setText("Ortszeit: " + bucket.getFormattedResetDateTime());
+
+        RecoveryProgressBar pbRec = view.findViewById(R.id.pbDetailRecovery);
+        float recFraction = bucket.getRecoveryFraction();
+        pbRec.setProgress(recFraction);
+
+        TextView tvRecRatio = view.findViewById(R.id.tvDetailRecoveryRatio);
+        if (recFraction >= 0.999f) {
+            tvRecRatio.setText("✅ 100% Wiederhergestellt");
+            tvRecRatio.setTextColor(0xFF10B981);
+        } else {
+            tvRecRatio.setText("Erholungsgrad: " + Math.round(recFraction * 100f) + "%");
+            tvRecRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recFraction));
+        }
+
+        // 4. Time Series Chart & History
+        UsageHistoryChartView chart = view.findViewById(R.id.chartHistoryView);
+        if ("CLAUDE".equals(provider)) {
+            chart.setThemeColor(0xFFA855F7);
+        } else {
+            chart.setThemeColor(0xFF38BDF8);
+        }
+
+        LinearLayout eventsContainer = view.findViewById(R.id.llHistoryEventsContainer);
+        Button btn24h = view.findViewById(R.id.btnHistory24h);
+        Button btn7d = view.findViewById(R.id.btnHistory7d);
+        Button btnAlarm = view.findViewById(R.id.btnDetailToggleAlarm);
+        Button btnCopy = view.findViewById(R.id.btnDetailCopySummary);
+        ImageButton btnClose = view.findViewById(R.id.btnDetailClose);
+
+        boolean isArmed = NotificationScheduler.isAlarmScheduled(this, bucket.bucketId);
+        btnAlarm.setText(isArmed ? "🔔 Alarm aktiv" : "🔔 Alarm aktivieren");
+        btnAlarm.setBackgroundResource(isArmed ? R.drawable.badge_background : R.drawable.button_background);
+
+        DetailDialogHolder holder = new DetailDialogHolder(
+                this, dialog, bucket, chart, eventsContainer, btn24h, btn7d, btnAlarm
+        );
+
+        btn24h.setOnClickListener(holder);
+        btn7d.setOnClickListener(holder);
+        btnAlarm.setOnClickListener(holder);
+        btnCopy.setOnClickListener(holder);
+        btnClose.setOnClickListener(holder);
+
+        // Initial 24h history load
+        holder.updateRange(24);
+
+        // 5. Models Breakdown & Token Mechanics
+        TextView tvModels = view.findViewById(R.id.tvDetailModelsList);
+        tvModels.setText(bucket.getDetailedModelList());
+
+        TextView tvMechanics = view.findViewById(R.id.tvDetailMechanicsExplanation);
+        tvMechanics.setText(bucket.getTokenWeightingExplanation());
+
+        dialog.show();
+    }
+
+    public void populateHistoryEvents(LinearLayout container, List<QuotaHistoryManager.HistoryEntry> entries) {
+        container.removeAllViews();
+        if (entries == null || entries.isEmpty()) {
+            TextView emptyTv = new TextView(this);
+            emptyTv.setText("Keine Ereignisse im gewählten Zeitraum");
+            emptyTv.setTextColor(0xFF64748B);
+            emptyTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            container.addView(emptyTv);
+            return;
+        }
+
+        // Show latest 5 entries in descending order
+        int count = Math.min(6, entries.size());
+        for (int i = entries.size() - 1; i >= entries.size() - count; i--) {
+            QuotaHistoryManager.HistoryEntry e = entries.get(i);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, dp(3), 0, dp(3));
+
+            TextView tvTime = new TextView(this);
+            tvTime.setText(e.formatDateTime());
+            tvTime.setTextColor(0xFF94A3B8);
+            tvTime.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+            LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(dp(85), LinearLayout.LayoutParams.WRAP_CONTENT);
+            row.addView(tvTime, tLp);
+
+            TextView tvPct = new TextView(this);
+            int rem = Math.round(e.remainingFraction * 100f);
+            tvPct.setText(rem + "% frei");
+            tvPct.setTextColor(rem > 50 ? 0xFF10B981 : (rem > 15 ? 0xFFF59E0B : 0xFFEF4444));
+            tvPct.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+            tvPct.setTypeface(null, Typeface.BOLD);
+            LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(dp(65), LinearLayout.LayoutParams.WRAP_CONTENT);
+            row.addView(tvPct, pLp);
+
+            TextView tvDesc = new TextView(this);
+            tvDesc.setText(e.sessionInfo != null ? e.sessionInfo : "Snapshot");
+            tvDesc.setTextColor(0xFF64748B);
+            tvDesc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+            tvDesc.setSingleLine(true);
+            tvDesc.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams dLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+            row.addView(tvDesc, dLp);
+
+            container.addView(row);
+        }
+    }
+
+    public void copyBucketDetailsToClipboard(QuotaBucket b) {
+        String text = "AI Limits • " + b.displayName + "\n" +
+                "Verfügbar: " + Math.round(b.remainingFraction * 100f) + "% (" + b.formatCountdown() + ")\n" +
+                "Status: " + b.getActiveSessionDescription() + "\n" +
+                "Reset-Zeit: " + b.getFormattedResetDateTime() + "\n" +
+                "Modelle:\n" + b.getDetailedModelList();
+        ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(ClipData.newPlainText("AI Quota", text));
+            Toast.makeText(this, "📋 In Zwischenablage kopiert", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showMessageCenterDialog() {

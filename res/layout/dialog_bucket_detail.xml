@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#0A0C10"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Top Bar: Badges, Title & Close -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvDetailProviderBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/badge_google"
+                android:paddingLeft="8dp"
+                android:paddingTop="3dp"
+                android:paddingRight="8dp"
+                android:paddingBottom="3dp"
+                android:text="🔵 Google IDE"
+                android:textColor="#7DD3FC"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDetailWindowBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/badge_window_week"
+                android:paddingLeft="8dp"
+                android:paddingTop="3dp"
+                android:paddingRight="8dp"
+                android:paddingBottom="3dp"
+                android:text=" W "
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1.0" />
+
+            <ImageButton
+                android:id="@+id/btnDetailClose"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/button_secondary_background"
+                android:contentDescription="Schließen"
+                android:src="@drawable/ic_refresh"
+                android:tint="#94A3B8" />
+        </LinearLayout>
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tvDetailTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Gemini Models (Wochenlimit)"
+            android:textColor="#F8FAFC"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- Live Token-Burn Status Card -->
+        <LinearLayout
+            android:id="@+id/llLiveBurnBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/card_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/tvLiveBurnHeadline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🔥 LIVE AKTIV: VERBRENNT TOKENS"
+                android:textColor="#FB923C"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvLiveBurnSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Antigravity IDE Session (Gemini 3.8 / 3.1 Coding)"
+                android:textColor="#CBD5E1"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Metrics & Circular Ring Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="#0F1218"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp">
+
+            <de.ailimits.app.CircularProgressView
+                android:id="@+id/cpDetailRing"
+                android:layout_width="76dp"
+                android:layout_height="76dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_weight="1.0"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvDetailCapacityStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="42% frei • 58% verbraucht"
+                    android:textColor="#F8FAFC"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvDetailResetCountdown"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Reset in 2 Tagen, 19 Stunden"
+                    android:textColor="#10B981"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvDetailExactResetDate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Ortszeit: Sa, 24. Okt 2026, 18:12 Uhr"
+                    android:textColor="#64748B"
+                    android:textSize="11sp" />
+
+                <de.ailimits.app.RecoveryProgressBar
+                    android:id="@+id/pbDetailRecovery"
+                    android:layout_width="match_parent"
+                    android:layout_height="7dp"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:id="@+id/tvDetailRecoveryRatio"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:text="Erholungsfortschritt: 58%"
+                    android:textColor="#F59E0B"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Time Series History Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.0"
+                    android:text="📈 Historische Zeitreihe"
+                    android:textColor="#F8FAFC"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnHistory24h"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:background="@drawable/button_background"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="24h"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp" />
+
+                <Button
+                    android:id="@+id/btnHistory7d"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/button_secondary_background"
+                    android:paddingLeft="8dp"
+                    android:paddingRight="8dp"
+                    android:text="7 Tage"
+                    android:textColor="#94A3B8"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <!-- Custom Canvas Chart -->
+            <de.ailimits.app.UsageHistoryChartView
+                android:id="@+id/chartHistoryView"
+                android:layout_width="match_parent"
+                android:layout_height="160dp"
+                android:layout_marginTop="10dp" />
+
+            <!-- Recent Snapshot Feed -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Letzte Messpunkte &amp; Deltas"
+                android:textColor="#94A3B8"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/llHistoryEventsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <!-- Detailed Model Breakdown Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/card_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🤖 Enthaltene Modelle &amp; Kontextgrenzen"
+                android:textColor="#F8FAFC"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDetailModelsList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="3dp"
+                android:text="• Modell 1\n• Modell 2"
+                android:textColor="#94A3B8"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Token Mechanics Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/card_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="ℹ️ Token-Gewichtung &amp; Kontingentlogik"
+                android:textColor="#F8FAFC"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDetailMechanicsExplanation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="3dp"
+                android:text="Token-Erklärung..."
+                android:textColor="#94A3B8"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Action Buttons Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnDetailToggleAlarm"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1.0"
+                android:background="@drawable/button_background"
+                android:text="🔔 Alarm aktivieren"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btnDetailCopySummary"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/button_secondary_background"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
+                android:text="📋 Kopieren"
+                android:textColor="#94A3B8"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

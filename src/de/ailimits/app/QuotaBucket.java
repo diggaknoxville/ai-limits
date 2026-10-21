@@ -158,33 +158,122 @@ public class QuotaBucket {
         return "Modellgruppe: " + (groupName != null ? groupName : "Standard AI Service");
     }
 
+    public boolean isActivelyBurningTokens() {
+        return remainingFraction < 0.995f;
+    }
+
     public String getActiveSessionDescription() {
         String provider = getProviderType();
         String badge = getWindowBadgeLetter();
+        boolean isBurning = isActivelyBurningTokens();
 
         if ("CLAUDE".equals(provider)) {
             if ("5".equals(badge)) {
-                if (remainingFraction < 0.98f) {
-                    return "🟢 LIVE AKTIV: Claude Code CLI Session (97% der Aktivität)";
+                if (isBurning) {
+                    return "🔥 VERBRENNT TOKENS: Claude Code CLI Session (97% Aktivität)";
                 } else {
-                    return "⚪ Standby: Keine laufende Claude Code Session";
+                    return "⚪ IDLE / Standby: 100% Kontingent bereit (Keine laufende Session)";
                 }
             } else {
-                return "⚡ Live-Aufteilung: Claude Code: 97% • Cowork: 3% • Chats: 0%";
+                if (isBurning) {
+                    return "🔥 AKTIVE NUTZUNG: Claude Code: 97% • Cowork: 3% • Chats: 0%";
+                } else {
+                    return "⚪ IDLE / Bereit: Wochenlimit vollständig unberührt";
+                }
             }
         } else if ("GOOGLE_CLOUD".equals(provider)) {
-            return "🟢 LIVE AKTIV: Google Cloud Developer Project (viersternelocalhorst@gmail.com)";
+            if (isBurning) {
+                return "🔥 VERBRENNT TOKENS: Cloud API-Calls auf Projekt gen-lang-client-0229011306";
+            } else {
+                return "⚪ IDLE / Standby: Keine aktiven API-Calls auf Google Cloud";
+            }
         } else if ("GOOGLE_IDE".equals(provider)) {
             if (bucketId != null && (bucketId.contains("argon") || displayName.toLowerCase(Locale.ROOT).contains("argon"))) {
-                return "🟢 LIVE AKTIV: Antigravity Deep Reasoning Session (Gemini 4 Argon)";
+                if (isBurning) {
+                    return "🔥 VERBRENNT TOKENS: Antigravity Deep Reasoning (Gemini 4 Argon)";
+                } else {
+                    return "⚪ IDLE / Bereit: Argon Reasoning-Puffer ungenutzt";
+                }
             } else if (bucketId != null && bucketId.startsWith("3p-")) {
-                return "🟢 LIVE AKTIV: Antigravity IDE Session (Claude & GPT Proxy)";
+                if (isBurning) {
+                    return "🔥 VERBRENNT TOKENS: IDE Claude & GPT Proxy API Calls";
+                } else {
+                    return "⚪ IDLE / Bereit: Keine aktiven Partner-Modell-Calls in IDE";
+                }
             } else {
-                return "🟢 LIVE AKTIV: Antigravity IDE Session (Gemini 3.8 / 3.1 Coding)";
+                if (isBurning) {
+                    return "🔥 VERBRENNT TOKENS: Gemini 3.8 Coding & Agent Session";
+                } else {
+                    return "⚪ IDLE / Bereit: Keine aktiven Antigravity IDE Anfragen";
+                }
             }
         }
 
-        return "⚡ Live Status: Kontingent überwacht";
+        return isBurning ? "🔥 VERBRENNT TOKENS: Aktiv in Nutzung" : "⚪ IDLE / Bereit: Kontingent ungenutzt";
+    }
+
+    public String getFormattedResetDateTime() {
+        if (resetTimeMillis <= 0) return "Kein Reset-Zeitpunkt bekannt";
+        SimpleDateFormat sdf = new SimpleDateFormat("E, d. MMM yyyy, HH:mm 'Uhr'", Locale.GERMAN);
+        return sdf.format(new Date(resetTimeMillis));
+    }
+
+    public String getDetailedModelList() {
+        String b = (bucketId != null ? bucketId : "").toLowerCase(Locale.ROOT);
+        String d = (displayName != null ? displayName : "").toLowerCase(Locale.ROOT);
+
+        if (b.contains("claude_pro_5h") || (d.contains("claude pro") && d.contains("5"))) {
+            return "• Claude 3.5 Sonnet (200k Kontext • Ultraschnell für Code-Generation)\n" +
+                   "• Claude 3 Opus (Höchste Reasoning-Tiefe für Systemarchitektur)\n" +
+                   "• Claude 3.5 Haiku (Leichtgewichtig & Schnell)";
+        }
+        if (b.contains("claude_pro_7d") || (d.contains("claude pro") && d.contains("woche"))) {
+            return "• Gesamtes Anthropic Claude Modellkontingent\n" +
+                   "• Deckt Claude Code CLI (97%) und Desktop Chats (3%) ab\n" +
+                   "• Wöchentliche Gesamtkapazitätsgrenze deines Pro-Plans";
+        }
+        if (b.contains("google_gemini_cloud_pro") || (d.contains("gemini") && d.contains("pro") && d.contains("direkt"))) {
+            return "• Gemini 1.5 Pro (2 Millionen Token Kontextfenster)\n" +
+                   "• Multimodal (Audio, Video, PDF & Large Codebase Analysen)\n" +
+                   "• Google Cloud Developer API Projekt (gen-lang-client-0229011306)";
+        }
+        if (b.contains("google_gemini_flash") || (d.contains("gemini") && d.contains("flash"))) {
+            return "• Gemini 1.5 Flash (1 Million Token Kontextfenster)\n" +
+                   "• Optimiert für maximale Token-Durchsatzrate & Latenz\n" +
+                   "• Google AI Studio Developer Tier";
+        }
+        if (b.contains("google_gemini_daily") || d.contains("tageskontingent")) {
+            return "• Google Cloud AI & Vertex Developer Requests\n" +
+                   "• RPD (Requests Per Day) & RPM Ratenbegrenzung\n" +
+                   "• Täglicher automatischer Reset um 00:00 UTC";
+        }
+        if (b.startsWith("3p-") || d.contains("claude & gpt")) {
+            return "• Claude 3.5 Sonnet (über Antigravity Proxy)\n" +
+                   "• Claude 3 Opus (über Antigravity Proxy)\n" +
+                   "• OpenAI GPT-4o & GPT-OSS (über Antigravity Proxy)\n" +
+                   "• Läuft direkt über dein Google IDE Kontingent";
+        }
+        if (b.startsWith("gemini-argon") || d.contains("argon")) {
+            return "• Gemini 4 Argon (Experimental Deep Reasoning Model)\n" +
+                   "• Hohe Inferenz-Zeit für komplexe Code-Refactorings\n" +
+                   "• Separates Pro/Ultra IDE Kontingent";
+        }
+        if (b.startsWith("gemini-") || d.contains("gemini models")) {
+            return "• Gemini 3.8 Pro (Antigravity Agentic Reasoning)\n" +
+                   "• Gemini 3.8 Flash (High Throughput Code Completion)\n" +
+                   "• Gemini 3.1 Flash (Low Latency Instant Response)\n" +
+                   "• Gemini 3.8 Pro Lite (Kompaktes schnelles Modell)";
+        }
+
+        return "• Standard AI Modellgruppe\n• Überwacht über Antigravity Bridge";
+    }
+
+    public String getTokenWeightingExplanation() {
+        return "Innerhalb dieser Gruppe teilen sich die Modelle das Kontingent proportional zum Token-Kostenaufwand:\n\n" +
+               "• Input-Tokens: Geringster Kontingent-Verbrauch (günstige Einlese-Phase).\n" +
+               "• Output-Tokens: Höchste Gewichtung (aufwändige Inferenz & Generierung).\n" +
+               "• Prompt-Caching: Bis zu 75% Ersparnis bei wiederholten Kontext-Abfragen.\n\n" +
+               "Das 5-Stunden-Fenster glättet Lastspitzen dynamisch ab, während das Wochenlimit fest an deinen Account-Tier gebunden ist.";
     }
 
     public String formatCountdown() {

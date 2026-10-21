@@ -826,27 +826,30 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         QuotaGroup weeklyGroup = new QuotaGroup("🗓️ Wochenlimits (7 Tage Langzeit-Kapazität)",
                 "Gesamte verfügbare Wochenkapazität über alle Anbieter & Modelle");
         weeklyGroup.models.add("Claude 3.5 Sonnet");
+        weeklyGroup.models.add("Gemini 3.8 Pro");
+        weeklyGroup.models.add("Gemini 3.8 Flash");
         weeklyGroup.models.add("Gemini 1.5 Flash");
-        weeklyGroup.models.add("Gemini 1.5 Pro");
+        weeklyGroup.models.add("Gemini 4 Argon");
 
         // 2. 5-Hour Limits Group (Rolling Windows & Sofort-Puffer)
         QuotaGroup fiveHourGroup = new QuotaGroup("⏱️ 5-Stunden-Limits (Sofort verfügbar)",
-                "Rolling Windows für intensive Programmier- & Prompt-Sessions");
-        fiveHourGroup.models.add("Claude Code");
-        fiveHourGroup.models.add("Gemini Pro API");
+                "Rolling Windows für intensive Programmier- & Agenten-Sessions");
+        fiveHourGroup.models.add("Claude Code (Anthropic)");
+        fiveHourGroup.models.add("Gemini 3.8 (Antigravity IDE)");
+        fiveHourGroup.models.add("Claude & GPT (Google IDE)");
+        fiveHourGroup.models.add("Gemini 1.5 Pro (Cloud Direkt)");
 
         // 3. Daily Limits Group (24h / Midnight Reset)
         QuotaGroup dailyGroup = new QuotaGroup("☀️ Tageslimits (Reset um Mitternacht UTC)",
                 "Tägliche Kontingente & Request-Limits (RPD)");
-        dailyGroup.models.add("Google AI Studio");
+        dailyGroup.models.add("Google Cloud Developer API");
 
         for (QuotaBucket b : all) {
             if (matchesBucketFilter(b, selectedFilter)) {
-                if ("weekly".equalsIgnoreCase(b.window) || b.displayName.toLowerCase(Locale.ROOT).contains("woche") || b.bucketId.contains("7d") || b.bucketId.contains("flash")) {
+                String wLetter = b.getWindowBadgeLetter();
+                if ("W".equals(wLetter)) {
                     weeklyGroup.buckets.add(b);
-                } else if ("5h".equalsIgnoreCase(b.window) || b.displayName.toLowerCase(Locale.ROOT).contains("5-stunde") || b.bucketId.contains("5h") || b.bucketId.contains("pro")) {
-                    fiveHourGroup.buckets.add(b);
-                } else if ("daily".equalsIgnoreCase(b.window) || b.displayName.toLowerCase(Locale.ROOT).contains("tag") || b.bucketId.contains("daily")) {
+                } else if ("T".equals(wLetter)) {
                     dailyGroup.buckets.add(b);
                 } else {
                     fiveHourGroup.buckets.add(b);
@@ -860,7 +863,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             for (QuotaBucket b : weeklyGroup.buckets) avgWeeklyFree += b.remainingFraction;
             avgWeeklyFree = avgWeeklyFree / weeklyGroup.buckets.size();
             weeklyGroup.description = String.format(Locale.GERMAN,
-                    "Verfügbare Gesamtkapazität: %.0f%% frei über alle Modelle • Claude 7d, Gemini Flash & Pro",
+                    "Verfügbare Gesamtkapazität: %.0f%% frei • Claude Pro, Google IDE & Cloud Direkt",
                     avgWeeklyFree * 100f);
             result.add(weeklyGroup);
         }
@@ -878,8 +881,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
     private boolean shouldIncludeInFilter(QuotaGroup group, String filter) {
         if ("ALL".equals(filter)) return true;
-        if ("CLAUDE".equals(filter)) return group.displayName.toLowerCase(Locale.ROOT).contains("claude");
-        if ("GOOGLE".equals(filter)) return group.displayName.toLowerCase(Locale.ROOT).contains("google") || group.displayName.toLowerCase(Locale.ROOT).contains("gemini");
+        if ("CLAUDE".equals(filter)) {
+            String dn = group.displayName.toLowerCase(Locale.ROOT);
+            return dn.contains("claude pro") || (dn.contains("anthropic") && !dn.contains("ide"));
+        }
+        if ("GOOGLE".equals(filter)) {
+            String dn = group.displayName.toLowerCase(Locale.ROOT);
+            return dn.contains("google") || dn.contains("gemini") || dn.contains("ide");
+        }
         for (QuotaBucket b : group.buckets) {
             if (matchesBucketFilter(b, filter)) return true;
         }
@@ -888,11 +897,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
     private boolean matchesBucketFilter(QuotaBucket b, String filter) {
         if ("ALL".equals(filter)) return true;
-        if ("WEEK".equals(filter)) return "weekly".equalsIgnoreCase(b.window) || b.displayName.toLowerCase(Locale.ROOT).contains("woche") || b.bucketId.contains("7d");
-        if ("5H".equals(filter)) return "5h".equalsIgnoreCase(b.window) || b.displayName.toLowerCase(Locale.ROOT).contains("5-stunde") || b.bucketId.contains("5h");
-        if ("DAY".equals(filter)) return "daily".equalsIgnoreCase(b.window) || b.displayName.toLowerCase(Locale.ROOT).contains("tag") || b.bucketId.contains("daily");
-        if ("CLAUDE".equals(filter)) return b.displayName.toLowerCase(Locale.ROOT).contains("claude") || (b.groupName != null && b.groupName.toLowerCase(Locale.ROOT).contains("claude"));
-        if ("GOOGLE".equals(filter)) return b.displayName.toLowerCase(Locale.ROOT).contains("google") || b.displayName.toLowerCase(Locale.ROOT).contains("gemini") || (b.groupName != null && b.groupName.toLowerCase(Locale.ROOT).contains("google"));
+        if ("WEEK".equals(filter)) return "W".equals(b.getWindowBadgeLetter());
+        if ("5H".equals(filter)) return "5".equals(b.getWindowBadgeLetter());
+        if ("DAY".equals(filter)) return "T".equals(b.getWindowBadgeLetter());
+        if ("CLAUDE".equals(filter)) return "CLAUDE".equals(b.getProviderType());
+        if ("GOOGLE".equals(filter)) return "GOOGLE_CLOUD".equals(b.getProviderType()) || "GOOGLE_IDE".equals(b.getProviderType());
         if ("CRITICAL".equals(filter)) return b.remainingFraction <= 0.25f;
         return true;
     }
@@ -1051,17 +1060,17 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 TextView badgeProvider = new TextView(this);
                 String provider = bucket.getProviderType();
                 if ("CLAUDE".equals(provider)) {
-                    badgeProvider.setText("🟣 Claude");
+                    badgeProvider.setText("🟣 Claude Pro");
                     badgeProvider.setTextColor(0xFFD8B4FE);
                     badgeProvider.setBackgroundResource(R.drawable.badge_claude);
-                } else if ("GOOGLE".equals(provider)) {
-                    badgeProvider.setText("🔵 Google");
+                } else if ("GOOGLE_IDE".equals(provider)) {
+                    badgeProvider.setText("🔵 Google IDE");
                     badgeProvider.setTextColor(0xFF7DD3FC);
                     badgeProvider.setBackgroundResource(R.drawable.badge_google);
                 } else {
-                    badgeProvider.setText("🟢 OpenAI");
-                    badgeProvider.setTextColor(0xFF86EFAC);
-                    badgeProvider.setBackgroundResource(R.drawable.badge_background);
+                    badgeProvider.setText("🔵 Cloud Direkt");
+                    badgeProvider.setTextColor(0xFF38BDF8);
+                    badgeProvider.setBackgroundResource(R.drawable.badge_google);
                 }
                 badgeProvider.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
                 badgeProvider.setTypeface(null, Typeface.BOLD);

@@ -86,12 +86,15 @@ public class GoogleDirectClient {
 
                 // 3. Build Direct Google Quota Group
                 QuotaGroup group = new QuotaGroup("Google Account (Cloud Direkt)",
-                        "Konto: " + email + (projectId.isEmpty() ? "" : " • ID: " + projectId) + "\nProjekt: " + projectName);
+                        "Konto: " + email + (projectId.isEmpty() ? "" : " • ID: " + projectId) + "\nProjekt: " + projectName + " (Öffentliche Cloud APIs: Gemini 1.5 Pro & Flash)");
+                group.models.add("Gemini 1.5 Pro");
+                group.models.add("Gemini 1.5 Flash");
+                group.models.add("Cloud Vertex AI");
 
                 // Gemini 1.5 Pro Window
                 QuotaBucket bRpm = new QuotaBucket();
                 bRpm.bucketId = "google_gemini_cloud_pro";
-                bRpm.displayName = "Gemini 1.5 Pro (Cloud Direkt)";
+                bRpm.displayName = "Gemini 1.5 Pro (Cloud Direkt API)";
                 bRpm.window = "5h";
                 bRpm.remainingFraction = 0.92f;
                 bRpm.groupName = group.displayName;
@@ -102,7 +105,7 @@ public class GoogleDirectClient {
                 // Gemini 1.5 Flash Window
                 QuotaBucket bFlash = new QuotaBucket();
                 bFlash.bucketId = "google_gemini_flash";
-                bFlash.displayName = "Gemini 1.5 Flash (Wochenlimit)";
+                bFlash.displayName = "Gemini 1.5 Flash (Cloud Direkt API)";
                 bFlash.window = "weekly";
                 bFlash.remainingFraction = 0.98f;
                 bFlash.groupName = group.displayName;
@@ -113,7 +116,7 @@ public class GoogleDirectClient {
                 // Daily Quota
                 QuotaBucket bRpd = new QuotaBucket();
                 bRpd.bucketId = "google_gemini_daily";
-                bRpd.displayName = "Google AI Tageskontingent";
+                bRpd.displayName = "Google Cloud AI (Tageslimit)";
                 bRpd.window = "daily";
                 bRpd.remainingFraction = 0.85f;
                 bRpd.groupName = group.displayName;

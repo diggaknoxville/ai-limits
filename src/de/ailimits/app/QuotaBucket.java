@@ -97,37 +97,59 @@ public class QuotaBucket {
     }
 
     public String getProviderType() {
-        String full = ((bucketId != null ? bucketId : "") + " " +
-                (displayName != null ? displayName : "") + " " +
-                (groupName != null ? groupName : "")).toLowerCase(Locale.ROOT);
-
-        if (full.contains("claude") || full.contains("anthropic")) return "CLAUDE";
-        if (full.contains("google") || full.contains("gemini")) return "GOOGLE";
-        if (full.contains("gpt") || full.contains("openai") || full.contains("codex")) return "OPENAI";
-        return "GOOGLE";
+        if (bucketId != null && bucketId.startsWith("claude_pro_")) {
+            return "CLAUDE";
+        }
+        if (groupName != null && groupName.toLowerCase(Locale.ROOT).contains("claude pro")) {
+            return "CLAUDE";
+        }
+        if (bucketId != null && (bucketId.startsWith("google_gemini_") || bucketId.contains("cloud_pro"))) {
+            return "GOOGLE_CLOUD";
+        }
+        if (groupName != null && groupName.toLowerCase(Locale.ROOT).contains("cloud direkt")) {
+            return "GOOGLE_CLOUD";
+        }
+        if (bucketId != null && (bucketId.startsWith("3p-") || bucketId.startsWith("gemini-") || bucketId.contains("argon"))) {
+            return "GOOGLE_IDE";
+        }
+        if (groupName != null && groupName.toLowerCase(Locale.ROOT).contains("ide")) {
+            return "GOOGLE_IDE";
+        }
+        return "GOOGLE_CLOUD";
     }
 
     public String getModelGroupExplanation() {
         String b = (bucketId != null ? bucketId : "").toLowerCase(Locale.ROOT);
         String d = (displayName != null ? displayName : "").toLowerCase(Locale.ROOT);
 
-        if (b.contains("claude_pro_5h") || (d.contains("claude") && d.contains("5"))) {
-            return "Modelle: Claude 3.5 Sonnet, Claude 3 Opus • Rolling 5h Arbeitsfenster";
+        // 1. Offizielles Claude Pro Abo (Anthropic Cloud Direkt)
+        if (b.contains("claude_pro_5h") || (d.contains("claude pro") && d.contains("5"))) {
+            return "Modelle: Claude 3.5 Sonnet, Claude 3 Opus • Offizielles Anthropic 5h-Fenster";
         }
-        if (b.contains("claude_pro_7d") || (d.contains("claude") && d.contains("woche"))) {
+        if (b.contains("claude_pro_7d") || (d.contains("claude pro") && d.contains("woche"))) {
             return "Modelle: Gesamtes Anthropic Claude Modellkontingent (Wochen-Obergrenze)";
         }
-        if (b.contains("google_gemini_cloud_pro") || (d.contains("gemini") && d.contains("pro"))) {
-            return "Modelle: Gemini 1.5 Pro (Multimodal & Reasoning) • Google Cloud API";
+
+        // 2. Google Cloud Direkt (Öffentliche APIs & Developer Quota)
+        if (b.contains("google_gemini_cloud_pro") || (d.contains("gemini") && d.contains("pro") && d.contains("direkt"))) {
+            return "Modelle: Gemini 1.5 Pro (Multimodal & 2M Context) • Google Cloud API";
         }
-        if (b.contains("google_gemini_flash") || (d.contains("gemini") && d.contains("flash"))) {
-            return "Modelle: Gemini 1.5 Flash (Speed & Large Context) • Google AI Studio";
+        if (b.contains("google_gemini_flash") || (d.contains("gemini") && d.contains("flash") && (b.contains("google_") || d.contains("direkt")))) {
+            return "Modelle: Gemini 1.5 Flash (High Speed) • Google AI Studio API";
         }
         if (b.contains("google_gemini_daily") || d.contains("tageskontingent")) {
-            return "Modelle: Google Cloud AI & Vertex Developer Requests (RPD)";
+            return "Modelle: Google Cloud AI & Vertex Developer Requests (RPD, Reset 0:00 UTC)";
         }
-        if (b.contains("gpt") || d.contains("gpt")) {
-            return "Modelle: OpenAI GPT-4o, GPT-4o-mini & Codex CLI";
+
+        // 3. Google IDE Models (Antigravity Umgebung)
+        if (b.startsWith("3p-") || d.contains("claude & gpt") || d.contains("claude and gpt")) {
+            return "Modelle: Claude 3.5 Sonnet, Claude 3 Opus, GPT-4o • Google Antigravity IDE Kontingent";
+        }
+        if (b.startsWith("gemini-argon") || d.contains("argon")) {
+            return "Modelle: Gemini 4 Argon (Advanced Deep Reasoning) • Google IDE Separates Kontingent";
+        }
+        if (b.startsWith("gemini-") || d.contains("gemini models")) {
+            return "Modelle: Gemini 3.8 Pro, 3.8 Pro Lite, 3.1 Flash & 3.8 Flash • Google IDE Antigravity";
         }
 
         if (description != null && !description.isEmpty()) {
@@ -150,16 +172,16 @@ public class QuotaBucket {
             } else {
                 return "⚡ Live-Aufteilung: Claude Code: 97% • Cowork: 3% • Chats: 0%";
             }
-        } else if ("GOOGLE".equals(provider)) {
-            if ("5".equals(badge) || "pro".equalsIgnoreCase(bucketId)) {
-                return "🟢 LIVE AKTIV: Antigravity IDE Session (gen-lang-client-0229011306)";
-            } else if ("W".equals(badge)) {
-                return "🟢 LIVE AKTIV: Google Cloud AI Studio Workspace (Wöchentlich)";
+        } else if ("GOOGLE_CLOUD".equals(provider)) {
+            return "🟢 LIVE AKTIV: Google Cloud Developer Project (viersternelocalhorst@gmail.com)";
+        } else if ("GOOGLE_IDE".equals(provider)) {
+            if (bucketId != null && (bucketId.contains("argon") || displayName.toLowerCase(Locale.ROOT).contains("argon"))) {
+                return "🟢 LIVE AKTIV: Antigravity Deep Reasoning Session (Gemini 4 Argon)";
+            } else if (bucketId != null && bucketId.startsWith("3p-")) {
+                return "🟢 LIVE AKTIV: Antigravity IDE Session (Claude & GPT Proxy)";
             } else {
-                return "⚡ Live aktiv: Cloud Developer Quota Tracking (RPD)";
+                return "🟢 LIVE AKTIV: Antigravity IDE Session (Gemini 3.8 / 3.1 Coding)";
             }
-        } else if ("OPENAI".equals(provider)) {
-            return "🟢 LIVE AKTIV: ChatGPT Plus & Codex Session";
         }
 
         return "⚡ Live Status: Kontingent überwacht";

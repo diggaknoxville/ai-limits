@@ -125,10 +125,54 @@ public class QuotaApiClient {
                 }
             }
 
-            callback.onSuccess(groupsList, overallDescription, isLive);
+            // CLUSTER ALL IDE GROUPS INTO A SINGLE "Google IDE Models (Antigravity)" GROUP
+            List<QuotaGroup> clusteredList = clusterIdeGroups(groupsList);
+            callback.onSuccess(clusteredList, overallDescription, isLive);
         } catch (Exception e) {
             callback.onError("Fehler beim Verarbeiten der Daten: " + e.getMessage());
         }
+    }
+
+    public static List<QuotaGroup> clusterIdeGroups(List<QuotaGroup> rawGroups) {
+        if (rawGroups == null || rawGroups.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        QuotaGroup ideGroup = new QuotaGroup(
+                "Google IDE Models (Antigravity)",
+                "Cluster: Gemini (3.8 Pro, 3.8 Flash, 3.1 Flash, Pro Lite), Claude (Sonnet/Opus), GPT-4o & Gemini 4 Argon • Geteiltes Antigravity-Kontingent"
+        );
+        ideGroup.models.add("Gemini 3.8 Pro");
+        ideGroup.models.add("Gemini 3.8 Flash");
+        ideGroup.models.add("Gemini 3.1 Flash");
+        ideGroup.models.add("Claude 3.5 Sonnet");
+        ideGroup.models.add("GPT-4o");
+        ideGroup.models.add("Gemini 4 Argon");
+
+        for (QuotaGroup rg : rawGroups) {
+            for (QuotaBucket b : rg.buckets) {
+                b.groupName = ideGroup.displayName;
+                String bid = b.bucketId != null ? b.bucketId.toLowerCase(java.util.Locale.ROOT) : "";
+                String dname = b.displayName != null ? b.displayName.toLowerCase(java.util.Locale.ROOT) : "";
+
+                if (bid.contains("argon") || dname.contains("argon")) {
+                    b.displayName = "Gemini 4 Argon (Wochenlimit)";
+                } else if (bid.contains("3p-weekly") || (dname.contains("claude") && dname.contains("weekly"))) {
+                    b.displayName = "Claude & GPT (Wochenlimit)";
+                } else if (bid.contains("3p-5h") || (dname.contains("claude") && dname.contains("5"))) {
+                    b.displayName = "Claude & GPT (5-Stunden-Limit)";
+                } else if (bid.contains("gemini-weekly") || (dname.contains("gemini") && dname.contains("weekly"))) {
+                    b.displayName = "Gemini Models (Wochenlimit)";
+                } else if (bid.contains("gemini-5h") || (dname.contains("gemini") && dname.contains("5"))) {
+                    b.displayName = "Gemini Models (5-Stunden-Limit)";
+                }
+                ideGroup.buckets.add(b);
+            }
+        }
+
+        List<QuotaGroup> result = new ArrayList<>();
+        result.add(ideGroup);
+        return result;
     }
 
     public static List<QuotaGroup> getSampleData() {
@@ -193,6 +237,6 @@ public class QuotaApiClient {
         g3.buckets.add(b3_1);
         list.add(g3);
 
-        return list;
+        return clusterIdeGroups(list);
     }
 }

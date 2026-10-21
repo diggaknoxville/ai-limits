@@ -210,7 +210,7 @@
                     android:layout_height="30dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/button_secondary_background"
-                    android:text="Claude Pro"
+                    android:text="🟣 Claude Pro"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
 
@@ -220,7 +220,7 @@
                     android:layout_height="30dp"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/button_secondary_background"
-                    android:text="Google Cloud"
+                    android:text="🔵 Google (Cloud &amp; IDE)"
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
 

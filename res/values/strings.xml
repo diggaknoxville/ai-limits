@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Limits</string>
+    <string name="title_models_usage">Models and usage</string>
+    <string name="subtitle_models_usage">Track your quotas, remaining tokens, and reset timers for Claude, Gemini, and GPT</string>
+    <string name="status_connected">Verbunden mit Antigravity</string>
+    <string name="status_connecting">Aktualisiere Daten…</string>
+    <string name="status_error">Keine Verbindung zum Dienst</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="settings">Einstellungen</string>
+    <string name="notification_channel_name">AI Limit Benachrichtigungen</string>
+    <string name="notification_channel_desc">Benachrichtigungen wenn Limits freigegeben werden</string>
+</resources>

@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0E1015"
+        android:pathData="M0,0h108v108h-108z"/>
+    <!-- Outer ring -->
+    <path
+        android:strokeColor="#1E293B"
+        android:strokeWidth="8"
+        android:fillColor="#00000000"
+        android:pathData="M54,18 A36,36 0 1,1 53.9,18"/>
+    <!-- Progress arc green -->
+    <path
+        android:strokeColor="#10B981"
+        android:strokeWidth="8"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,18 A36,36 0 1,1 28,78"/>
+    <!-- Central AI spark icon -->
+    <path
+        android:fillColor="#3B82F6"
+        android:pathData="M54,38 L57,48 L67,51 L57,54 L54,64 L51,54 L41,51 L51,48 Z"/>
+</vector>

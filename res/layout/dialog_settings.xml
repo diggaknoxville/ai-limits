@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/card_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AI Accounts &amp; Einstellungen"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Verbindung zu Claude Pro Cloud, Google Cloud &amp; Benachrichtigungen."
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <!-- SECTION 1: Claude Pro Cloud Direct -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="1. Claude Pro (Anthropic Direkt • Unterwegs)"
+            android:textColor="@color/card_border_highlight"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Funktioniert weltweit über Mobilfunk/WLAN ohne PC."
+            android:textColor="@color/text_muted"
+            android:textSize="11sp" />
+
+        <EditText
+            android:id="@+id/etClaudeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/edit_background"
+            android:hint="Claude Refresh Token (sk-ant-ort01-...)"
+            android:inputType="text"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnTestClaude"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/button_secondary_background"
+            android:text="Claude Cloud prüfen (api.anthropic.com)"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <!-- SECTION 2: Google Cloud Direct & Account -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="2. Google Account (Cloud Direkt • Unterwegs)"
+            android:textColor="@color/card_border_highlight"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvGoogleAccountDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Direktabruf über Google Cloud OAuth Console."
+            android:textColor="@color/text_muted"
+            android:textSize="11sp" />
+
+        <EditText
+            android:id="@+id/etGoogleRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/edit_background"
+            android:hint="Google Refresh Token (1//033...)"
+            android:inputType="text"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnTestGoogleDirect"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/button_secondary_background"
+            android:text="Google Cloud prüfen (oauth2.googleapis.com)"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <!-- SECTION 3: Antigravity Local Bridge -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="3. Antigravity Desktop-Bridge (Optional)"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/etHost"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="2"
+                android:background="@drawable/edit_background"
+                android:hint="127.0.0.1"
+                android:inputType="textUri"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/etPort"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/edit_background"
+                android:hint="41359"
+                android:inputType="number"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/etToken"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/edit_background"
+            android:hint="Antigravity CSRF Token"
+            android:inputType="text"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="11sp" />
+
+        <!-- SECTION 4: Theme & Notification Settings (Features 6, 8, 9) -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="4. Features &amp; Benachrichtigungen"
+            android:textColor="@color/card_border_highlight"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <CheckBox
+            android:id="@+id/cbOledMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Pure OLED Black Modus (Akkusparen auf Volla Phone)"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <CheckBox
+            android:id="@+id/cbNotifyLow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="Frühwarnung bei &lt; 15% (Limit fast voll)"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <CheckBox
+            android:id="@+id/cbNotifyFull"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="Erinnerung bei 100% vollständigem Reset"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp" />
+
+        <!-- Test Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnTestConnection"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:background="@drawable/button_secondary_background"
+                android:text="Bridge prüfen"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnTestNotification"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/button_secondary_background"
+                android:text="🔔 Test-Alarm"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Save / Cancel -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnCancelSettings"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@drawable/button_secondary_background"
+                android:text="Abbrechen"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnSaveSettings"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/button_background"
+                android:text="Speichern"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

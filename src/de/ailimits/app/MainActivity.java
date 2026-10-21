@@ -13,6 +13,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -109,12 +110,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         public QuotaBucket bucket;
         public TextView tvCountdown;
         public CircularProgressView progressView;
+        public RecoveryProgressBar recoveryBar;
+        public TextView tvRecoveryRatio;
         public Button btnAlarm;
 
-        public TickerItem(QuotaBucket b, TextView tv, CircularProgressView cp, Button btn) {
+        public TickerItem(QuotaBucket b, TextView tv, CircularProgressView cp, RecoveryProgressBar rBar, TextView tvRec, Button btn) {
             this.bucket = b;
             this.tvCountdown = tv;
             this.progressView = cp;
+            this.recoveryBar = rBar;
+            this.tvRecoveryRatio = tvRec;
             this.btnAlarm = btn;
         }
     }
@@ -655,6 +660,20 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             if (item.tvCountdown != null && item.bucket != null) {
                 item.tvCountdown.setText(item.bucket.formatCountdown());
             }
+            if (item.recoveryBar != null && item.bucket != null) {
+                float recFraction = item.bucket.getRecoveryFraction();
+                item.recoveryBar.setProgress(recFraction);
+                if (item.tvRecoveryRatio != null) {
+                    if (recFraction >= 0.999f) {
+                        item.tvRecoveryRatio.setText("✅ 100% Bereit");
+                        item.tvRecoveryRatio.setTextColor(0xFF10B981);
+                    } else {
+                        int pct = Math.round(recFraction * 100f);
+                        item.tvRecoveryRatio.setText(String.format(Locale.US, "Erholung: %d%%", pct));
+                        item.tvRecoveryRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recFraction));
+                    }
+                }
+            }
         }
 
         long now = System.currentTimeMillis();
@@ -983,78 +1002,209 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
             // Buckets
             for (final QuotaBucket bucket : group.buckets) {
-                LinearLayout bucketRow = new LinearLayout(this);
-                bucketRow.setOrientation(LinearLayout.HORIZONTAL);
-                bucketRow.setGravity(Gravity.CENTER_VERTICAL);
-                bucketRow.setBackgroundColor(0xFF0F1218);
-                bucketRow.setPadding(dp(12), dp(12), dp(12), dp(12));
+                LinearLayout bucketCard = new LinearLayout(this);
+                bucketCard.setOrientation(LinearLayout.VERTICAL);
+                bucketCard.setBackgroundColor(0xFF0F1218);
+                bucketCard.setPadding(dp(12), dp(12), dp(12), dp(12));
 
                 LinearLayout.LayoutParams bLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                bLp.topMargin = dp(12);
-                bucketRow.setLayoutParams(bLp);
+                bLp.topMargin = dp(10);
+                bucketCard.setLayoutParams(bLp);
 
-                // Circular Progress View
+                // Top section: Left Usage Ring, Right info column
+                LinearLayout topRow = new LinearLayout(this);
+                topRow.setOrientation(LinearLayout.HORIZONTAL);
+                topRow.setGravity(Gravity.CENTER_VERTICAL);
+                topRow.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                ));
+
+                // 1. LINKS: IMMER USAGE RING
                 final CircularProgressView cp = new CircularProgressView(this);
                 int size = dp(76);
                 LinearLayout.LayoutParams cpLp = new LinearLayout.LayoutParams(size, size);
+                cpLp.rightMargin = dp(12);
                 cp.setLayoutParams(cpLp);
                 cp.setProgress(bucket.remainingFraction);
-                bucketRow.addView(cp);
+                topRow.addView(cp);
 
-                // Details Column
+                // 2. RECHTE SPALTE
                 LinearLayout detailsCol = new LinearLayout(this);
                 detailsCol.setOrientation(LinearLayout.VERTICAL);
                 LinearLayout.LayoutParams detLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-                detLp.leftMargin = dp(14);
                 detailsCol.setLayoutParams(detLp);
 
-                TextView tvBTitle = new TextView(this);
-                tvBTitle.setText(bucket.displayName);
-                tvBTitle.setTextColor(0xFFF8FAFC);
-                tvBTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-                tvBTitle.setTypeface(null, Typeface.BOLD);
-                detailsCol.addView(tvBTitle);
+                // Header line: Provider Badge + Window Badge (5 / W / T) + Title + Alarm Button
+                LinearLayout headerLine = new LinearLayout(this);
+                headerLine.setOrientation(LinearLayout.HORIZONTAL);
+                headerLine.setGravity(Gravity.CENTER_VERTICAL);
+                headerLine.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                ));
 
-                if (bucket.description != null && !bucket.description.isEmpty()) {
-                    TextView tvBDesc = new TextView(this);
-                    tvBDesc.setText(bucket.description);
-                    tvBDesc.setTextColor(0xFF94A3B8);
-                    tvBDesc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-                    detailsCol.addView(tvBDesc);
+                // Provider-Symbol
+                TextView badgeProvider = new TextView(this);
+                String provider = bucket.getProviderType();
+                if ("CLAUDE".equals(provider)) {
+                    badgeProvider.setText("🟣 Claude");
+                    badgeProvider.setTextColor(0xFFD8B4FE);
+                    badgeProvider.setBackgroundResource(R.drawable.badge_claude);
+                } else if ("GOOGLE".equals(provider)) {
+                    badgeProvider.setText("🔵 Google");
+                    badgeProvider.setTextColor(0xFF7DD3FC);
+                    badgeProvider.setBackgroundResource(R.drawable.badge_google);
+                } else {
+                    badgeProvider.setText("🟢 OpenAI");
+                    badgeProvider.setTextColor(0xFF86EFAC);
+                    badgeProvider.setBackgroundResource(R.drawable.badge_background);
                 }
-
-                final TextView tvCountdown = new TextView(this);
-                tvCountdown.setText(bucket.formatCountdown());
-                tvCountdown.setTextColor(bucket.remainingFraction > 0.5f ? 0xFF10B981 : (bucket.remainingFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444));
-                tvCountdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-                tvCountdown.setTypeface(null, Typeface.BOLD);
-                LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(
+                badgeProvider.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                badgeProvider.setTypeface(null, Typeface.BOLD);
+                LinearLayout.LayoutParams bpLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                 );
-                countLp.topMargin = dp(4);
-                detailsCol.addView(tvCountdown, countLp);
+                bpLp.rightMargin = dp(6);
+                headerLine.addView(badgeProvider, bpLp);
+
+                // Offensichtliche 5 bzw. W (bzw. T) Kontingentart-Badge
+                TextView badgeWindow = new TextView(this);
+                String badgeLetter = bucket.getWindowBadgeLetter();
+                if ("5".equals(badgeLetter)) {
+                    badgeWindow.setText(" 5h ");
+                    badgeWindow.setTextColor(0xFF000000);
+                    badgeWindow.setBackgroundResource(R.drawable.badge_window_5h);
+                } else if ("W".equals(badgeLetter)) {
+                    badgeWindow.setText(" W ");
+                    badgeWindow.setTextColor(0xFFFFFFFF);
+                    badgeWindow.setBackgroundResource(R.drawable.badge_window_week);
+                } else {
+                    badgeWindow.setText(" T ");
+                    badgeWindow.setTextColor(0xFF000000);
+                    badgeWindow.setBackgroundResource(R.drawable.badge_window_day);
+                }
+                badgeWindow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                badgeWindow.setTypeface(null, Typeface.BOLD);
+                LinearLayout.LayoutParams bwLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                bwLp.rightMargin = dp(6);
+                headerLine.addView(badgeWindow, bwLp);
+
+                // Title
+                TextView tvBTitle = new TextView(this);
+                tvBTitle.setText(bucket.displayName);
+                tvBTitle.setTextColor(0xFFF8FAFC);
+                tvBTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+                tvBTitle.setTypeface(null, Typeface.BOLD);
+                tvBTitle.setSingleLine(true);
+                tvBTitle.setEllipsize(TextUtils.TruncateAt.END);
+                LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                tvBTitle.setLayoutParams(titleLp);
+                headerLine.addView(tvBTitle);
 
                 // Alarm Button
                 final Button btnAlarm = new Button(this);
                 boolean isArmed = NotificationScheduler.isAlarmScheduled(this, bucket.bucketId);
                 updateAlarmButtonState(btnAlarm, isArmed);
                 btnAlarm.setOnClickListener(new AlarmClickListener(this, bucket, btnAlarm));
-
                 LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
-                        dp(32)
+                        dp(26)
                 );
-                btnLp.topMargin = dp(6);
-                detailsCol.addView(btnAlarm, btnLp);
+                btnLp.leftMargin = dp(6);
+                headerLine.addView(btnAlarm, btnLp);
 
-                bucketRow.addView(detailsCol);
-                card.addView(bucketRow);
+                detailsCol.addView(headerLine);
 
-                tickerItems.add(new TickerItem(bucket, tvCountdown, cp, btnAlarm));
+                // Erklärungstext welches Model bzw. welche Modellgruppe
+                TextView tvModelExp = new TextView(this);
+                tvModelExp.setText(bucket.getModelGroupExplanation());
+                tvModelExp.setTextColor(0xFF94A3B8);
+                tvModelExp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                LinearLayout.LayoutParams expLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                expLp.topMargin = dp(4);
+                detailsCol.addView(tvModelExp, expLp);
+
+                // Live-Nutzung & Session-Anzeige
+                TextView tvSession = new TextView(this);
+                String sessionDesc = bucket.getActiveSessionDescription();
+                tvSession.setText(sessionDesc);
+                if (sessionDesc.contains("LIVE AKTIV")) {
+                    tvSession.setTextColor(0xFF34D399); // Crisp Emerald
+                } else {
+                    tvSession.setTextColor(0xFF64748B); // Slate Muted
+                }
+                tvSession.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                tvSession.setTypeface(null, Typeface.BOLD);
+                LinearLayout.LayoutParams sessLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                sessLp.topMargin = dp(3);
+                detailsCol.addView(tvSession, sessLp);
+
+                topRow.addView(detailsCol);
+                bucketCard.addView(topRow);
+
+                // 3. UNTEN: FORTSCHRITTSBALKEN BIS ES WIEDER VERFÜGBAR IST
+                // Fließend von Rot (noch lange) -> Gelb (halb) -> Grün (noch kurz)
+                final RecoveryProgressBar recoveryBar = new RecoveryProgressBar(this);
+                float recoveryFraction = bucket.getRecoveryFraction();
+                recoveryBar.setProgress(recoveryFraction);
+                LinearLayout.LayoutParams recLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(7)
+                );
+                recLp.topMargin = dp(10);
+                bucketCard.addView(recoveryBar, recLp);
+
+                // Statuszeile unter dem Recovery-Balken
+                LinearLayout statusRow = new LinearLayout(this);
+                statusRow.setOrientation(LinearLayout.HORIZONTAL);
+                statusRow.setGravity(Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams statLp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                statLp.topMargin = dp(4);
+                statusRow.setLayoutParams(statLp);
+
+                final TextView tvCountdown = new TextView(this);
+                tvCountdown.setText(bucket.formatCountdown());
+                tvCountdown.setTextColor(bucket.remainingFraction > 0.5f ? 0xFF10B981 : (bucket.remainingFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444));
+                tvCountdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                tvCountdown.setTypeface(null, Typeface.BOLD);
+                LinearLayout.LayoutParams cdLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
+                statusRow.addView(tvCountdown, cdLp);
+
+                final TextView tvRecoveryRatio = new TextView(this);
+                if (recoveryFraction >= 0.999f) {
+                    tvRecoveryRatio.setText("✅ 100% Bereit");
+                    tvRecoveryRatio.setTextColor(0xFF10B981);
+                } else {
+                    int pct = Math.round(recoveryFraction * 100f);
+                    tvRecoveryRatio.setText(String.format(Locale.US, "Erholung: %d%%", pct));
+                    tvRecoveryRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recoveryFraction));
+                }
+                tvRecoveryRatio.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+                tvRecoveryRatio.setTypeface(null, Typeface.BOLD);
+                statusRow.addView(tvRecoveryRatio);
+
+                bucketCard.addView(statusRow);
+
+                card.addView(bucketCard);
+
+                tickerItems.add(new TickerItem(bucket, tvCountdown, cp, recoveryBar, tvRecoveryRatio, btnAlarm));
             }
 
             llGroupsContainer.addView(card);
@@ -1062,11 +1212,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
     }
 
     public void updateAlarmButtonState(Button btn, boolean isArmed) {
-        btn.setText(isArmed ? "🔔 Alarm aktiv" : "🔔 Erinnern wenn frei");
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        btn.setTextColor(isArmed ? 0xFF10B981 : 0xFFF8FAFC);
+        btn.setText(isArmed ? "🔔 An" : "🔔 Aus");
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        btn.setTextColor(isArmed ? 0xFF10B981 : 0xFF94A3B8);
         btn.setBackgroundResource(isArmed ? R.drawable.badge_background : R.drawable.button_secondary_background);
-        btn.setPadding(dp(10), dp(2), dp(10), dp(2));
+        btn.setPadding(dp(8), dp(2), dp(8), dp(2));
     }
 
     private void showMessageCenterDialog() {

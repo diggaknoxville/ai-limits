@@ -99,3 +99,4 @@ Credentials can be configured directly inside the app:
 ## 📄 License
 
 MIT License. See [LICENSE](LICENSE) for details.
+

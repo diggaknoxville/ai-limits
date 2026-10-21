@@ -231,16 +231,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 updateRange(168);
             } else if (id == R.id.btnDetailToggleAlarm) {
                 boolean isArmed = NotificationScheduler.isAlarmScheduled(activity, bucket.bucketId);
+                String lang = AppI18n.getLang();
+                String enableStr = AppI18n.LANG_DE.equals(lang) ? "🔔 Alarm aktivieren" : (AppI18n.LANG_FR.equals(lang) ? "🔔 Activer l'alerte" : "🔔 Enable Alert");
+                String activeStr = AppI18n.LANG_DE.equals(lang) ? "🔔 Alarm aktiv" : (AppI18n.LANG_FR.equals(lang) ? "🔔 Alerte active" : "🔔 Alert Active");
                 if (isArmed) {
                     NotificationScheduler.cancelResetNotification(activity, bucket.bucketId);
-                    btnAlarm.setText("🔔 Alarm aktivieren");
+                    btnAlarm.setText(enableStr);
                     btnAlarm.setBackgroundResource(R.drawable.button_background);
-                    Toast.makeText(activity, "Alarm entfernt", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, AppI18n.LANG_DE.equals(lang) ? "Alarm entfernt" : "Alert disabled", Toast.LENGTH_SHORT).show();
                 } else {
                     NotificationScheduler.scheduleResetNotification(activity, bucket);
-                    btnAlarm.setText("🔔 Alarm aktiv");
+                    btnAlarm.setText(activeStr);
                     btnAlarm.setBackgroundResource(R.drawable.badge_background);
-                    Toast.makeText(activity, "Alarm aktiviert", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(activity, AppI18n.LANG_DE.equals(lang) ? "Alarm aktiviert" : "Alert scheduled", Toast.LENGTH_SHORT).show();
                 }
             } else if (id == R.id.btnDetailCopySummary) {
                 activity.copyBucketDetailsToClipboard(bucket);
@@ -252,27 +255,30 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             QuotaApiClient.QuotaCallback, ClaudeDirectClient.ClaudeUsageCallback, GoogleDirectClient.GoogleDirectCallback {
         final MainActivity activity;
         final AlertDialog dialog;
+        final RadioGroup rgLanguage;
+        final RadioGroup rgTheme;
         final EditText etClaudeRefresh;
         final EditText etGoogleRefresh;
         final EditText etHost;
         final EditText etPort;
         final EditText etToken;
-        final CheckBox cbOledMode;
         final CheckBox cbNotifyLow;
         final CheckBox cbNotifyFull;
 
         SettingsDialogHolder(MainActivity activity, AlertDialog dialog,
+                             RadioGroup rgLanguage, RadioGroup rgTheme,
                              EditText claudeRef, EditText googleRef,
                              EditText host, EditText port, EditText token,
-                             CheckBox oled, CheckBox notifyLow, CheckBox notifyFull) {
+                             CheckBox notifyLow, CheckBox notifyFull) {
             this.activity = activity;
             this.dialog = dialog;
+            this.rgLanguage = rgLanguage;
+            this.rgTheme = rgTheme;
             this.etClaudeRefresh = claudeRef;
             this.etGoogleRefresh = googleRef;
             this.etHost = host;
             this.etPort = port;
             this.etToken = token;
-            this.cbOledMode = oled;
             this.cbNotifyLow = notifyLow;
             this.cbNotifyFull = notifyFull;
         }
@@ -283,6 +289,28 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             if (id == R.id.btnCancelSettings) {
                 dialog.dismiss();
             } else if (id == R.id.btnSaveSettings) {
+                // Save Language
+                String newLang = AppI18n.LANG_EN;
+                int langId = rgLanguage != null ? rgLanguage.getCheckedRadioButtonId() : -1;
+                if (langId == R.id.rbLangDe) {
+                    newLang = AppI18n.LANG_DE;
+                } else if (langId == R.id.rbLangFr) {
+                    newLang = AppI18n.LANG_FR;
+                }
+                AppI18n.setLang(activity, newLang);
+
+                // Save Theme
+                String newTheme = ThemeManager.THEME_CYBERPUNK;
+                int themeId = rgTheme != null ? rgTheme.getCheckedRadioButtonId() : -1;
+                if (themeId == R.id.rbThemeOled) {
+                    newTheme = ThemeManager.THEME_OLED;
+                } else if (themeId == R.id.rbThemeOcean) {
+                    newTheme = ThemeManager.THEME_OCEAN;
+                } else if (themeId == R.id.rbThemeEmerald) {
+                    newTheme = ThemeManager.THEME_EMERALD;
+                }
+                ThemeManager.setThemeKey(activity, newTheme);
+
                 String cRef = etClaudeRefresh.getText().toString().trim();
                 String gRef = etGoogleRefresh.getText().toString().trim();
                 String host = etHost.getText().toString().trim();
@@ -298,20 +326,21 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                         .putString(KEY_HOST, host)
                         .putInt(KEY_PORT, port)
                         .putString(KEY_TOKEN, token)
-                        .putBoolean(KEY_OLED_MODE, cbOledMode.isChecked())
                         .putBoolean(KEY_NOTIFY_LOW, cbNotifyLow.isChecked())
                         .putBoolean(KEY_NOTIFY_FULL, cbNotifyFull.isChecked())
                         .apply();
 
-                activity.applyOledMode();
-                Toast.makeText(activity, "Einstellungen gespeichert", Toast.LENGTH_SHORT).show();
+                activity.applyAppTheme();
+                activity.updateLocalizedMainUi();
+                activity.rebuildCombinedUi();
+                Toast.makeText(activity, AppI18n.getSettingsSavedToast(), Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
                 activity.loadQuotaData();
             } else if (id == R.id.btnTestClaude) {
-                Toast.makeText(activity, "Prüfe Claude Cloud API (anthropic.com)…", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, "Testing Claude Cloud API...", Toast.LENGTH_SHORT).show();
                 ClaudeDirectClient.fetchClaudeGroup(activity, this);
             } else if (id == R.id.btnTestGoogleDirect) {
-                Toast.makeText(activity, "Prüfe Google Cloud Account Direkt…", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, "Testing Google Cloud Account...", Toast.LENGTH_SHORT).show();
                 GoogleDirectClient.fetchGoogleDirect(activity, this);
             } else if (id == R.id.btnTestConnection) {
                 String host = etHost.getText().toString().trim();
@@ -321,15 +350,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 } catch (Exception ignored) {}
                 String token = etToken.getText().toString().trim();
 
-                Toast.makeText(activity, "Prüfe Desktop-Bridge (" + host + ":" + port + ")…", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, "Testing Desktop Bridge (" + host + ":" + port + ")...", Toast.LENGTH_SHORT).show();
                 QuotaApiClient.fetchQuota(host, port, token, this);
             } else if (id == R.id.btnTestNotification) {
                 ResetReceiver.showNotification(
                         activity,
-                        "AI Limits: Claude & Google",
-                        "Dein 5-Stunden-Limit ist wieder verfügbar (100% frei)!"
+                        "AI Limits: Quota Restored",
+                        "Your AI quota has been fully restored (100% ready)!"
                 );
-                Toast.makeText(activity, "🔔 Test-Benachrichtigung gesendet!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(activity, "🔔 Test alert sent!", Toast.LENGTH_SHORT).show();
             }
         }
 
@@ -477,6 +506,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         mainHandler = new Handler(Looper.getMainLooper());
         prefs = getSharedPreferences(PREF_CONFIG, MODE_PRIVATE);
 
+        AppI18n.init(this);
+        ThemeManager.init(this);
+
         // Pre-seed default tokens if not already saved or empty
         if (prefs.getString(KEY_CLAUDE_ACCESS_TOKEN, "").isEmpty()) {
             prefs.edit()
@@ -537,7 +569,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         quickTimerEndTime = prefs.getLong("quick_timer_end", 0L);
 
-        applyOledMode();
+        applyAppTheme();
+        updateLocalizedMainUi();
         updateViewModeButtons();
         updateFilterChipStyles();
 
@@ -561,14 +594,37 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         loadQuotaData();
     }
 
-    private void applyOledMode() {
-        boolean oled = prefs.getBoolean(KEY_OLED_MODE, false);
+    public void applyAppTheme() {
+        ThemeManager.ThemeColors c = ThemeManager.getColors();
         if (svRoot != null) {
-            svRoot.setBackgroundColor(oled ? 0xFF000000 : 0xFF0E1015);
+            svRoot.setBackgroundColor(c.bg);
         }
         if (getWindow() != null) {
-            getWindow().setBackgroundDrawable(new ColorDrawable(oled ? 0xFF000000 : 0xFF0E1015));
+            getWindow().setBackgroundDrawable(new ColorDrawable(c.bg));
         }
+    }
+
+    public void updateLocalizedMainUi() {
+        TextView tvTitle = findViewById(R.id.tvTitle);
+        TextView tvSubtitle = findViewById(R.id.tvSubtitle);
+        if (tvTitle != null) tvTitle.setText(AppI18n.getAppTitle());
+        if (tvSubtitle != null) tvSubtitle.setText(AppI18n.getAppSubtitle());
+
+        if (btnViewHorizon != null) btnViewHorizon.setText(AppI18n.getViewHorizon());
+        if (btnViewProvider != null) btnViewProvider.setText(AppI18n.getViewProvider());
+
+        if (chipFilterAll != null) chipFilterAll.setText(AppI18n.getFilterAll());
+        if (chipFilterWeek != null) chipFilterWeek.setText(AppI18n.getFilterWeek());
+        if (chipFilter5h != null) chipFilter5h.setText(AppI18n.getFilter5h());
+        if (chipFilterDay != null) chipFilterDay.setText(AppI18n.getFilterDay());
+        if (chipFilterClaude != null) chipFilterClaude.setText(AppI18n.getFilterClaude());
+        if (chipFilterGoogle != null) chipFilterGoogle.setText(AppI18n.getFilterGoogle());
+        if (chipFilterCritical != null) chipFilterCritical.setText(AppI18n.getFilterCritical());
+
+        if (btnQuickTimer != null) btnQuickTimer.setText(AppI18n.getQuickTimerStart());
+
+        TextView tvSavingsTitle = findViewById(R.id.tvSavingsCardTitle);
+        if (tvSavingsTitle != null) tvSavingsTitle.setText(AppI18n.getSavingsCardTitle());
     }
 
     @Override
@@ -877,16 +933,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         // Status Bar Update
         if (claudeIsLive && googleDirectIsLive) {
-            tvStatus.setText("● Claude Cloud & Google Cloud Live");
+            tvStatus.setText(AppI18n.getStatusLiveBoth());
             tvStatus.setTextColor(0xFF10B981);
         } else if (claudeIsLive) {
-            tvStatus.setText("● Claude Cloud Live • Google Standby");
+            tvStatus.setText(AppI18n.getStatusClaudeLive());
             tvStatus.setTextColor(0xFF38BDF8);
         } else if (googleDirectIsLive) {
-            tvStatus.setText("● Google Cloud Live • Claude Standby");
+            tvStatus.setText(AppI18n.getStatusGoogleLive());
             tvStatus.setTextColor(0xFF38BDF8);
         } else {
-            tvStatus.setText("● Offline / Demo-Modus");
+            tvStatus.setText(AppI18n.getStatusOffline());
             tvStatus.setTextColor(0xFFEF4444);
         }
 
@@ -896,38 +952,34 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         List<QuotaBucket> allBuckets = collectAllBuckets();
         QuotaHistoryManager hist = QuotaHistoryManager.getInstance(this);
         for (QuotaBucket b : allBuckets) {
-            hist.seedInitialHistoryIfEmpty(b);
             hist.recordSnapshot(b);
         }
 
         renderQuotaGroups(combined, googleOverallDescription);
     }
 
-    // Build Time-Horizon View (Wochenlimits zuerst, dann 5h, dann Tag)
+    // Build Time-Horizon View (Weekly limits first, then 5h, then daily)
     private List<QuotaGroup> buildHorizonView() {
         List<QuotaGroup> result = new ArrayList<>();
         List<QuotaBucket> all = collectAllBuckets();
 
-        // 1. Weekly Limits Group (7 Tage & Langzeit-Kapazität)
-        QuotaGroup weeklyGroup = new QuotaGroup("🗓️ Wochenlimits (7 Tage Langzeit-Kapazität)",
-                "Gesamte verfügbare Wochenkapazität über alle Anbieter & Modelle");
+        // 1. Weekly Limits Group (7-day long term capacity)
+        QuotaGroup weeklyGroup = new QuotaGroup(AppI18n.getHorizonWeeklyTitle(), "");
         weeklyGroup.models.add("Claude 3.5 Sonnet");
         weeklyGroup.models.add("Gemini 3.8 Pro");
         weeklyGroup.models.add("Gemini 3.8 Flash");
         weeklyGroup.models.add("Gemini 1.5 Flash");
         weeklyGroup.models.add("Gemini 4 Argon");
 
-        // 2. 5-Hour Limits Group (Rolling Windows & Sofort-Puffer)
-        QuotaGroup fiveHourGroup = new QuotaGroup("⏱️ 5-Stunden-Limits (Sofort verfügbar)",
-                "Rolling Windows für intensive Programmier- & Agenten-Sessions");
+        // 2. 5-Hour Limits Group (Rolling windows for instant buffer)
+        QuotaGroup fiveHourGroup = new QuotaGroup(AppI18n.getHorizon5hTitle(), "");
         fiveHourGroup.models.add("Claude Code (Anthropic)");
         fiveHourGroup.models.add("Gemini 3.8 (Antigravity IDE)");
         fiveHourGroup.models.add("Claude & GPT (Google IDE)");
-        fiveHourGroup.models.add("Gemini 1.5 Pro (Cloud Direkt)");
+        fiveHourGroup.models.add("Gemini 1.5 Pro (Cloud Direct)");
 
         // 3. Daily Limits Group (24h / Midnight Reset)
-        QuotaGroup dailyGroup = new QuotaGroup("☀️ Tageslimits (Reset um Mitternacht UTC)",
-                "Tägliche Kontingente & Request-Limits (RPD)");
+        QuotaGroup dailyGroup = new QuotaGroup(AppI18n.getHorizonDailyTitle(), "");
         dailyGroup.models.add("Google Cloud Developer API");
 
         for (QuotaBucket b : all) {
@@ -948,17 +1000,23 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             float avgWeeklyFree = 0f;
             for (QuotaBucket b : weeklyGroup.buckets) avgWeeklyFree += b.remainingFraction;
             avgWeeklyFree = avgWeeklyFree / weeklyGroup.buckets.size();
-            weeklyGroup.description = String.format(Locale.GERMAN,
-                    "Verfügbare Gesamtkapazität: %.0f%% frei • Claude Pro, Google IDE & Cloud Direkt",
-                    avgWeeklyFree * 100f);
+            weeklyGroup.description = AppI18n.getHorizonWeeklyDesc(avgWeeklyFree);
             result.add(weeklyGroup);
         }
 
         if (!fiveHourGroup.buckets.isEmpty()) {
+            float avg5hFree = 0f;
+            for (QuotaBucket b : fiveHourGroup.buckets) avg5hFree += b.remainingFraction;
+            avg5hFree = avg5hFree / fiveHourGroup.buckets.size();
+            fiveHourGroup.description = AppI18n.getHorizon5hDesc(avg5hFree);
             result.add(fiveHourGroup);
         }
 
         if (!dailyGroup.buckets.isEmpty()) {
+            float avgDailyFree = 0f;
+            for (QuotaBucket b : dailyGroup.buckets) avgDailyFree += b.remainingFraction;
+            avgDailyFree = avgDailyFree / dailyGroup.buckets.size();
+            dailyGroup.description = AppI18n.getHorizonDailyDesc(avgDailyFree);
             result.add(dailyGroup);
         }
 
@@ -1140,16 +1198,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 // Provider-Symbol
                 TextView badgeProvider = new TextView(this);
                 String provider = bucket.getProviderType();
+                badgeProvider.setText(AppI18n.getProviderBadgeText(provider));
                 if ("CLAUDE".equals(provider)) {
-                    badgeProvider.setText("🟣 Claude Pro");
                     badgeProvider.setTextColor(0xFFD8B4FE);
                     badgeProvider.setBackgroundResource(R.drawable.badge_claude);
                 } else if ("GOOGLE_IDE".equals(provider)) {
-                    badgeProvider.setText("🔵 Google IDE");
                     badgeProvider.setTextColor(0xFF7DD3FC);
                     badgeProvider.setBackgroundResource(R.drawable.badge_google);
                 } else {
-                    badgeProvider.setText("🔵 Cloud Direkt");
                     badgeProvider.setTextColor(0xFF38BDF8);
                     badgeProvider.setBackgroundResource(R.drawable.badge_google);
                 }
@@ -1162,19 +1218,17 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 bpLp.rightMargin = dp(5);
                 headerLine.addView(badgeProvider, bpLp);
 
-                // Offensichtliche 5 bzw. W (bzw. T) Kontingentart-Badge
+                // Window Badge (5h / W / D)
                 TextView badgeWindow = new TextView(this);
                 String badgeLetter = bucket.getWindowBadgeLetter();
+                badgeWindow.setText(AppI18n.getWindowLetter(badgeLetter));
                 if ("5".equals(badgeLetter)) {
-                    badgeWindow.setText(" 5h ");
                     badgeWindow.setTextColor(0xFF000000);
                     badgeWindow.setBackgroundResource(R.drawable.badge_window_5h);
                 } else if ("W".equals(badgeLetter)) {
-                    badgeWindow.setText(" W ");
                     badgeWindow.setTextColor(0xFFFFFFFF);
                     badgeWindow.setBackgroundResource(R.drawable.badge_window_week);
                 } else {
-                    badgeWindow.setText(" T ");
                     badgeWindow.setTextColor(0xFF000000);
                     badgeWindow.setBackgroundResource(R.drawable.badge_window_day);
                 }
@@ -1213,7 +1267,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
                 detailsCol.addView(headerLine);
 
-                // Erklärungstext welches Model bzw. welche Modellgruppe
+                // Model Explanation
                 TextView tvModelExp = new TextView(this);
                 tvModelExp.setText(bucket.getModelGroupExplanation());
                 tvModelExp.setTextColor(0xFF94A3B8);
@@ -1227,31 +1281,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 expLp.topMargin = dp(2);
                 detailsCol.addView(tvModelExp, expLp);
 
-                // Live-Nutzung & Session-Anzeige
-                TextView tvSession = new TextView(this);
-                String sessionDesc = bucket.getActiveSessionDescription();
-                tvSession.setText(sessionDesc);
-                if (bucket.isActivelyBurningTokens()) {
-                    tvSession.setTextColor(0xFFFB923C); // Warm Orange/Coral for Active Token Burn
-                } else {
-                    tvSession.setTextColor(0xFF64748B); // Slate Muted for Idle/Standby
-                }
-                tvSession.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-                tvSession.setTypeface(null, Typeface.BOLD);
-                tvSession.setSingleLine(true);
-                tvSession.setEllipsize(TextUtils.TruncateAt.END);
-                LinearLayout.LayoutParams sessLp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                );
-                sessLp.topMargin = dp(2);
-                detailsCol.addView(tvSession, sessLp);
-
                 topRow.addView(detailsCol);
                 bucketCard.addView(topRow);
 
-                // 3. UNTEN: FORTSCHRITTSBALKEN BIS ES WIEDER VERFÜGBAR IST
-                // Fließend von Rot (noch lange) -> Gelb (halb) -> Grün (noch kurz)
+                // Recovery Progress Bar
                 final RecoveryProgressBar recoveryBar = new RecoveryProgressBar(this);
                 float recoveryFraction = bucket.getRecoveryFraction();
                 recoveryBar.setProgress(recoveryFraction);
@@ -1262,7 +1295,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 recLp.topMargin = dp(6);
                 bucketCard.addView(recoveryBar, recLp);
 
-                // Statuszeile unter dem Recovery-Balken
+                // Status Row
                 LinearLayout statusRow = new LinearLayout(this);
                 statusRow.setOrientation(LinearLayout.HORIZONTAL);
                 statusRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -1283,11 +1316,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
                 final TextView tvRecoveryRatio = new TextView(this);
                 if (recoveryFraction >= 0.999f) {
-                    tvRecoveryRatio.setText("✅ 100% Bereit");
+                    tvRecoveryRatio.setText(AppI18n.getFullReady());
                     tvRecoveryRatio.setTextColor(0xFF10B981);
                 } else {
                     int pct = Math.round(recoveryFraction * 100f);
-                    tvRecoveryRatio.setText(String.format(Locale.US, "Erholung: %d%%", pct));
+                    tvRecoveryRatio.setText(AppI18n.getRecoveryPct(pct));
                     tvRecoveryRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recoveryFraction));
                 }
                 tvRecoveryRatio.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
@@ -1306,7 +1339,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
     }
 
     public void updateAlarmButtonState(Button btn, boolean isArmed) {
-        btn.setText(isArmed ? "🔔 An" : "🔔 Aus");
+        String lang = AppI18n.getLang();
+        String onStr = AppI18n.LANG_DE.equals(lang) ? "An" : (AppI18n.LANG_FR.equals(lang) ? "Actif" : "On");
+        String offStr = AppI18n.LANG_DE.equals(lang) ? "Aus" : (AppI18n.LANG_FR.equals(lang) ? "Inactif" : "Off");
+        btn.setText("🔔 " + (isArmed ? onStr : offStr));
         btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
         btn.setTextColor(isArmed ? 0xFF10B981 : 0xFF94A3B8);
         btn.setBackgroundResource(isArmed ? R.drawable.badge_background : R.drawable.button_secondary_background);
@@ -1326,32 +1362,28 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         // 1. Badges & Title
         TextView tvProvider = view.findViewById(R.id.tvDetailProviderBadge);
         String provider = bucket.getProviderType();
+        tvProvider.setText(AppI18n.getProviderBadgeText(provider));
         if ("CLAUDE".equals(provider)) {
-            tvProvider.setText("🟣 Claude Pro");
             tvProvider.setTextColor(0xFFD8B4FE);
             tvProvider.setBackgroundResource(R.drawable.badge_claude);
         } else if ("GOOGLE_IDE".equals(provider)) {
-            tvProvider.setText("🔵 Google IDE");
             tvProvider.setTextColor(0xFF7DD3FC);
             tvProvider.setBackgroundResource(R.drawable.badge_google);
         } else {
-            tvProvider.setText("🔵 Cloud Direkt");
             tvProvider.setTextColor(0xFF38BDF8);
             tvProvider.setBackgroundResource(R.drawable.badge_google);
         }
 
         TextView tvWindow = view.findViewById(R.id.tvDetailWindowBadge);
         String wLetter = bucket.getWindowBadgeLetter();
+        tvWindow.setText(AppI18n.getWindowLetter(wLetter));
         if ("5".equals(wLetter)) {
-            tvWindow.setText(" 5h ");
             tvWindow.setTextColor(0xFF000000);
             tvWindow.setBackgroundResource(R.drawable.badge_window_5h);
         } else if ("W".equals(wLetter)) {
-            tvWindow.setText(" W ");
             tvWindow.setTextColor(0xFFFFFFFF);
             tvWindow.setBackgroundResource(R.drawable.badge_window_week);
         } else {
-            tvWindow.setText(" T ");
             tvWindow.setTextColor(0xFF000000);
             tvWindow.setBackgroundResource(R.drawable.badge_window_day);
         }
@@ -1359,33 +1391,20 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         TextView tvTitle = view.findViewById(R.id.tvDetailTitle);
         tvTitle.setText(bucket.displayName);
 
-        // 2. Live Token-Burn Status
-        TextView tvBurnHeadline = view.findViewById(R.id.tvLiveBurnHeadline);
-        TextView tvBurnSubtitle = view.findViewById(R.id.tvLiveBurnSubtitle);
-        boolean isBurning = bucket.isActivelyBurningTokens();
-        if (isBurning) {
-            tvBurnHeadline.setText("🔥 AKTIV: VERBRENNT GERADE TOKENS");
-            tvBurnHeadline.setTextColor(0xFFFB923C);
-        } else {
-            tvBurnHeadline.setText("⚪ IDLE / STANDBY: KEIN TOKEN-VERBRAUCH");
-            tvBurnHeadline.setTextColor(0xFF94A3B8);
-        }
-        tvBurnSubtitle.setText(bucket.getActiveSessionDescription());
-
-        // 3. Circular Ring & Metrics
+        // 2. Circular Ring & Metrics
         CircularProgressView cpRing = view.findViewById(R.id.cpDetailRing);
         cpRing.setProgress(bucket.remainingFraction);
 
         TextView tvCapStatus = view.findViewById(R.id.tvDetailCapacityStatus);
         int remPct = Math.round(bucket.remainingFraction * 100f);
-        tvCapStatus.setText(remPct + "% frei • " + (100 - remPct) + "% verbraucht");
+        tvCapStatus.setText(AppI18n.getDetailCapacity(remPct));
 
         TextView tvCountdown = view.findViewById(R.id.tvDetailResetCountdown);
         tvCountdown.setText(bucket.formatCountdown());
         tvCountdown.setTextColor(bucket.remainingFraction > 0.5f ? 0xFF10B981 : (bucket.remainingFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444));
 
         TextView tvExactDate = view.findViewById(R.id.tvDetailExactResetDate);
-        tvExactDate.setText("Ortszeit: " + bucket.getFormattedResetDateTime());
+        tvExactDate.setText(bucket.getFormattedResetDateTime());
 
         RecoveryProgressBar pbRec = view.findViewById(R.id.pbDetailRecovery);
         float recFraction = bucket.getRecoveryFraction();
@@ -1393,20 +1412,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         TextView tvRecRatio = view.findViewById(R.id.tvDetailRecoveryRatio);
         if (recFraction >= 0.999f) {
-            tvRecRatio.setText("✅ 100% Wiederhergestellt");
+            tvRecRatio.setText(AppI18n.getFullReady());
             tvRecRatio.setTextColor(0xFF10B981);
         } else {
-            tvRecRatio.setText("Erholungsgrad: " + Math.round(recFraction * 100f) + "%");
+            tvRecRatio.setText(AppI18n.getRecoveryPct(Math.round(recFraction * 100f)));
             tvRecRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recFraction));
         }
 
-        // 4. Time Series Chart & History
+        // 3. Time Series Chart & History
         UsageHistoryChartView chart = view.findViewById(R.id.chartHistoryView);
-        if ("CLAUDE".equals(provider)) {
-            chart.setThemeColor(0xFFA855F7);
-        } else {
-            chart.setThemeColor(0xFF38BDF8);
-        }
+        chart.setThemeColor(ThemeManager.getColors().accentPrimary);
+
+        TextView tvHistHeader = view.findViewById(R.id.tvDetailHistoryHeader);
+        if (tvHistHeader != null) tvHistHeader.setText(AppI18n.getTimelineHeader());
 
         LinearLayout eventsContainer = view.findViewById(R.id.llHistoryEventsContainer);
         Button btn24h = view.findViewById(R.id.btnHistory24h);
@@ -1415,8 +1433,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         Button btnCopy = view.findViewById(R.id.btnDetailCopySummary);
         ImageButton btnClose = view.findViewById(R.id.btnDetailClose);
 
+        btn24h.setText(AppI18n.getBtn24h());
+        btn7d.setText(AppI18n.getBtn7d());
+        btnCopy.setText(AppI18n.getBtnCopy());
+        btnClose.setContentDescription(AppI18n.getBtnClose());
+
         boolean isArmed = NotificationScheduler.isAlarmScheduled(this, bucket.bucketId);
-        btnAlarm.setText(isArmed ? "🔔 Alarm aktiv" : "🔔 Alarm aktivieren");
+        btnAlarm.setText(isArmed ? "🔔 Alarm Active" : "🔔 Set Alarm");
         btnAlarm.setBackgroundResource(isArmed ? R.drawable.badge_background : R.drawable.button_background);
 
         DetailDialogHolder holder = new DetailDialogHolder(
@@ -1432,9 +1455,15 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         // Initial 24h history load
         holder.updateRange(24);
 
-        // 5. Models Breakdown & Token Mechanics
+        // 4. Models Breakdown & Token Mechanics
+        TextView tvModelsHeader = view.findViewById(R.id.tvDetailModelsHeader);
+        if (tvModelsHeader != null) tvModelsHeader.setText(AppI18n.getModelsHeader());
+
         TextView tvModels = view.findViewById(R.id.tvDetailModelsList);
         tvModels.setText(bucket.getDetailedModelList());
+
+        TextView tvMechHeader = view.findViewById(R.id.tvDetailMechanicsHeader);
+        if (tvMechHeader != null) tvMechHeader.setText(AppI18n.getMechanicsHeader());
 
         TextView tvMechanics = view.findViewById(R.id.tvDetailMechanicsExplanation);
         tvMechanics.setText(bucket.getTokenWeightingExplanation());
@@ -1446,14 +1475,14 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         container.removeAllViews();
         if (entries == null || entries.isEmpty()) {
             TextView emptyTv = new TextView(this);
-            emptyTv.setText("Keine Ereignisse im gewählten Zeitraum");
+            emptyTv.setText(AppI18n.getTimelineEmpty());
             emptyTv.setTextColor(0xFF64748B);
             emptyTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
             container.addView(emptyTv);
             return;
         }
 
-        // Show latest 5 entries in descending order
+        // Show latest 6 entries in descending order
         int count = Math.min(6, entries.size());
         for (int i = entries.size() - 1; i >= entries.size() - count; i--) {
             QuotaHistoryManager.HistoryEntry e = entries.get(i);
@@ -1471,7 +1500,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
             TextView tvPct = new TextView(this);
             int rem = Math.round(e.remainingFraction * 100f);
-            tvPct.setText(rem + "% frei");
+            tvPct.setText(rem + "%");
             tvPct.setTextColor(rem > 50 ? 0xFF10B981 : (rem > 15 ? 0xFFF59E0B : 0xFFEF4444));
             tvPct.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
             tvPct.setTypeface(null, Typeface.BOLD);
@@ -1479,7 +1508,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             row.addView(tvPct, pLp);
 
             TextView tvDesc = new TextView(this);
-            tvDesc.setText(e.sessionInfo != null ? e.sessionInfo : "Snapshot");
+            tvDesc.setText(e.sessionInfo != null && !e.sessionInfo.isEmpty() ? e.sessionInfo : "Snapshot");
             tvDesc.setTextColor(0xFF64748B);
             tvDesc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
             tvDesc.setSingleLine(true);
@@ -1493,14 +1522,13 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
     public void copyBucketDetailsToClipboard(QuotaBucket b) {
         String text = "AI Limits • " + b.displayName + "\n" +
-                "Verfügbar: " + Math.round(b.remainingFraction * 100f) + "% (" + b.formatCountdown() + ")\n" +
-                "Status: " + b.getActiveSessionDescription() + "\n" +
-                "Reset-Zeit: " + b.getFormattedResetDateTime() + "\n" +
-                "Modelle:\n" + b.getDetailedModelList();
+                "Capacity: " + Math.round(b.remainingFraction * 100f) + "% (" + b.formatCountdown() + ")\n" +
+                "Reset: " + b.getFormattedResetDateTime() + "\n" +
+                "Models:\n" + b.getDetailedModelList();
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm != null) {
             cm.setPrimaryClip(ClipData.newPlainText("AI Quota", text));
-            Toast.makeText(this, "📋 In Zwischenablage kopiert", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "📋 Copied to clipboard", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1586,13 +1614,62 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         AlertDialog dialog = builder.create();
 
+        RadioGroup rgLanguage = dialogView.findViewById(R.id.rgLanguage);
+        RadioGroup rgTheme = dialogView.findViewById(R.id.rgTheme);
+
+        String curLang = AppI18n.getLang();
+        if (AppI18n.LANG_DE.equals(curLang)) {
+            rgLanguage.check(R.id.rbLangDe);
+        } else if (AppI18n.LANG_FR.equals(curLang)) {
+            rgLanguage.check(R.id.rbLangFr);
+        } else {
+            rgLanguage.check(R.id.rbLangEn);
+        }
+
+        String curTheme = ThemeManager.getThemeKey();
+        if (ThemeManager.THEME_OLED.equals(curTheme)) {
+            rgTheme.check(R.id.rbThemeOled);
+        } else if (ThemeManager.THEME_OCEAN.equals(curTheme)) {
+            rgTheme.check(R.id.rbThemeOcean);
+        } else if (ThemeManager.THEME_EMERALD.equals(curTheme)) {
+            rgTheme.check(R.id.rbThemeEmerald);
+        } else {
+            rgTheme.check(R.id.rbThemeCyberpunk);
+        }
+
+        TextView tvTitle = dialogView.findViewById(R.id.tvSettingsTitle);
+        TextView tvSub = dialogView.findViewById(R.id.tvSettingsSubtitle);
+        TextView tvSecLang = dialogView.findViewById(R.id.tvSectionLanguage);
+        TextView tvSecTheme = dialogView.findViewById(R.id.tvSectionTheme);
+        TextView tvSecClaude = dialogView.findViewById(R.id.tvSectionClaude);
+        TextView tvSecGoogle = dialogView.findViewById(R.id.tvSectionGoogle);
+        TextView tvSecBridge = dialogView.findViewById(R.id.tvSectionBridge);
+        TextView tvSecNotif = dialogView.findViewById(R.id.tvSectionNotifications);
+
+        if (tvTitle != null) tvTitle.setText(AppI18n.getSettingsTitle());
+        if (tvSub != null) tvSub.setText(AppI18n.getSettingsSubtitle());
+        if (tvSecLang != null) tvSecLang.setText(AppI18n.getSectionLanguage());
+        if (tvSecTheme != null) tvSecTheme.setText(AppI18n.getSectionTheme());
+        if (tvSecClaude != null) tvSecClaude.setText(AppI18n.getSectionClaude());
+        if (tvSecGoogle != null) tvSecGoogle.setText(AppI18n.getSectionGoogle());
+        if (tvSecBridge != null) tvSecBridge.setText(AppI18n.getSectionBridge());
+        if (tvSecNotif != null) tvSecNotif.setText(AppI18n.getSectionNotifications());
+
+        RadioButton rbThCyber = dialogView.findViewById(R.id.rbThemeCyberpunk);
+        RadioButton rbThOled = dialogView.findViewById(R.id.rbThemeOled);
+        RadioButton rbThOcean = dialogView.findViewById(R.id.rbThemeOcean);
+        RadioButton rbThEmer = dialogView.findViewById(R.id.rbThemeEmerald);
+        if (rbThCyber != null) rbThCyber.setText(AppI18n.getThemeNameCyberpunk());
+        if (rbThOled != null) rbThOled.setText(AppI18n.getThemeNameOled());
+        if (rbThOcean != null) rbThOcean.setText(AppI18n.getThemeNameOcean());
+        if (rbThEmer != null) rbThEmer.setText(AppI18n.getThemeNameEmerald());
+
         EditText etClaudeRefresh = dialogView.findViewById(R.id.etClaudeRefresh);
         EditText etGoogleRefresh = dialogView.findViewById(R.id.etGoogleRefresh);
         EditText etHost = dialogView.findViewById(R.id.etHost);
         EditText etPort = dialogView.findViewById(R.id.etPort);
         EditText etToken = dialogView.findViewById(R.id.etToken);
 
-        CheckBox cbOled = dialogView.findViewById(R.id.cbOledMode);
         CheckBox cbNotifyLow = dialogView.findViewById(R.id.cbNotifyLow);
         CheckBox cbNotifyFull = dialogView.findViewById(R.id.cbNotifyFull);
 
@@ -1603,21 +1680,28 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         Button btnSave = dialogView.findViewById(R.id.btnSaveSettings);
         Button btnCancel = dialogView.findViewById(R.id.btnCancelSettings);
 
+        btnTestClaude.setText(AppI18n.getBtnTestClaude());
+        btnTestGoogleDirect.setText(AppI18n.getBtnTestGoogle());
+        btnTestConn.setText(AppI18n.getBtnTestBridge());
+        btnTestNotif.setText(AppI18n.getBtnTestAlert());
+        btnCancel.setText(AppI18n.getBtnCancel());
+        btnSave.setText(AppI18n.getBtnSave());
+
         etClaudeRefresh.setText(prefs.getString(KEY_CLAUDE_REFRESH_TOKEN, DEFAULT_CLAUDE_REFRESH));
         etGoogleRefresh.setText(prefs.getString(KEY_GOOGLE_REFRESH_TOKEN, DEFAULT_GOOGLE_REFRESH));
         etHost.setText(prefs.getString(KEY_HOST, DEFAULT_GOOGLE_HOST));
         etPort.setText(String.valueOf(prefs.getInt(KEY_PORT, DEFAULT_GOOGLE_PORT)));
         etToken.setText(prefs.getString(KEY_TOKEN, DEFAULT_GOOGLE_CSRF));
 
-        cbOled.setChecked(prefs.getBoolean(KEY_OLED_MODE, false));
         cbNotifyLow.setChecked(prefs.getBoolean(KEY_NOTIFY_LOW, true));
         cbNotifyFull.setChecked(prefs.getBoolean(KEY_NOTIFY_FULL, true));
 
         SettingsDialogHolder holder = new SettingsDialogHolder(
                 this, dialog,
+                rgLanguage, rgTheme,
                 etClaudeRefresh, etGoogleRefresh,
                 etHost, etPort, etToken,
-                cbOled, cbNotifyLow, cbNotifyFull
+                cbNotifyLow, cbNotifyFull
         );
 
         btnTestClaude.setOnClickListener(holder);

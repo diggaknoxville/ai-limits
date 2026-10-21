@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/svDetailRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="#0A0C10"
@@ -57,7 +58,7 @@
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:background="@drawable/button_secondary_background"
-                android:contentDescription="Schließen"
+                android:contentDescription="Close"
                 android:src="@drawable/ic_refresh"
                 android:tint="#94A3B8" />
         </LinearLayout>
@@ -68,42 +69,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Gemini Models (Wochenlimit)"
+            android:text="AI Model Quota"
             android:textColor="#F8FAFC"
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <!-- Live Token-Burn Status Card -->
-        <LinearLayout
-            android:id="@+id/llLiveBurnBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/card_background"
-            android:orientation="vertical"
-            android:padding="12dp">
-
-            <TextView
-                android:id="@+id/tvLiveBurnHeadline"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="🔥 LIVE AKTIV: VERBRENNT TOKENS"
-                android:textColor="#FB923C"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tvLiveBurnSubtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Antigravity IDE Session (Gemini 3.8 / 3.1 Coding)"
-                android:textColor="#CBD5E1"
-                android:textSize="11sp" />
-        </LinearLayout>
-
         <!-- Metrics & Circular Ring Row -->
         <LinearLayout
+            android:id="@+id/llDetailMetricsBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -128,7 +101,7 @@
                     android:id="@+id/tvDetailCapacityStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="42% frei • 58% verbraucht"
+                    android:text="100% available • 0% used"
                     android:textColor="#F8FAFC"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -138,7 +111,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Reset in 2 Tagen, 19 Stunden"
+                    android:text="Resets in ..."
                     android:textColor="#10B981"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -148,33 +121,18 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Ortszeit: Sa, 24. Okt 2026, 18:12 Uhr"
-                    android:textColor="#64748B"
+                    android:text="Local time: ..."
+                    android:textColor="#94A3B8"
                     android:textSize="11sp" />
-
-                <de.ailimits.app.RecoveryProgressBar
-                    android:id="@+id/pbDetailRecovery"
-                    android:layout_width="match_parent"
-                    android:layout_height="7dp"
-                    android:layout_marginTop="8dp" />
-
-                <TextView
-                    android:id="@+id/tvDetailRecoveryRatio"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:text="Erholungsfortschritt: 58%"
-                    android:textColor="#F59E0B"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Time Series History Section -->
+        <!-- Progress to next recovery -->
         <LinearLayout
+            android:id="@+id/llDetailRecoveryBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="10dp"
             android:background="@drawable/card_background"
             android:orientation="vertical"
             android:padding="12dp">
@@ -186,12 +144,56 @@
                 android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/tvDetailRecoveryHeader"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1.0"
-                    android:text="📈 Historische Zeitreihe"
+                    android:text="Recovery Status"
                     android:textColor="#F8FAFC"
-                    android:textSize="14sp"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvDetailRecoveryRatio"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100% Ready"
+                    android:textColor="#10B981"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <de.ailimits.app.RecoveryProgressBar
+                android:id="@+id/pbDetailRecovery"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
+        <!-- Usage History Timeline Section -->
+        <LinearLayout
+            android:id="@+id/llDetailHistoryBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/card_background"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvDetailHistoryHeader"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.0"
+                    android:text="📈 Usage History Timeline (SQLite)"
+                    android:textColor="#F8FAFC"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
 
                 <Button
@@ -213,7 +215,7 @@
                     android:background="@drawable/button_secondary_background"
                     android:paddingLeft="8dp"
                     android:paddingRight="8dp"
-                    android:text="7 Tage"
+                    android:text="7d"
                     android:textColor="#94A3B8"
                     android:textSize="10sp" />
             </LinearLayout>
@@ -227,10 +229,11 @@
 
             <!-- Recent Snapshot Feed -->
             <TextView
+                android:id="@+id/tvDetailSnapshotsHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Letzte Messpunkte &amp; Deltas"
+                android:text="Recent Measured Snapshots"
                 android:textColor="#94A3B8"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -245,6 +248,7 @@
 
         <!-- Detailed Model Breakdown Card -->
         <LinearLayout
+            android:id="@+id/llDetailModelsBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -253,11 +257,12 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/tvDetailModelsHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="🤖 Enthaltene Modelle &amp; Kontextgrenzen"
+                android:text="🤖 Included Models &amp; Specifications"
                 android:textColor="#F8FAFC"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -266,13 +271,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:lineSpacingExtra="3dp"
-                android:text="• Modell 1\n• Modell 2"
+                android:text="• Model 1\n• Model 2"
                 android:textColor="#94A3B8"
                 android:textSize="11sp" />
         </LinearLayout>
 
         <!-- Token Mechanics Card -->
         <LinearLayout
+            android:id="@+id/llDetailMechanicsBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -281,11 +287,12 @@
             android:padding="12dp">
 
             <TextView
+                android:id="@+id/tvDetailMechanicsHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="ℹ️ Token-Gewichtung &amp; Kontingentlogik"
+                android:text="ℹ️ Token Weighting Mechanics"
                 android:textColor="#F8FAFC"
-                android:textSize="14sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -294,7 +301,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:lineSpacingExtra="3dp"
-                android:text="Token-Erklärung..."
+                android:text="Token explanation..."
                 android:textColor="#94A3B8"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -313,7 +320,7 @@
                 android:layout_height="38dp"
                 android:layout_weight="1.0"
                 android:background="@drawable/button_background"
-                android:text="🔔 Alarm aktivieren"
+                android:text="🔔 Enable Alert"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -326,7 +333,7 @@
                 android:background="@drawable/button_secondary_background"
                 android:paddingLeft="12dp"
                 android:paddingRight="12dp"
-                android:text="📋 Kopieren"
+                android:text="📋 Copy Summary"
                 android:textColor="#94A3B8"
                 android:textSize="12sp" />
         </LinearLayout>

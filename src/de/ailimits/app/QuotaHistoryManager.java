@@ -10,12 +10,12 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 public class QuotaHistoryManager extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "ai_limits_history.db";
-    private static final int DATABASE_VERSION = 1;
+    // Version 2 cleanly wipes legacy synthetic mock data
+    private static final int DATABASE_VERSION = 2;
 
     public static final String TABLE_HISTORY = "quota_history";
     public static final String COL_ID = "_id";
@@ -35,10 +35,10 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
     }
 
     public static class HistoryEntry {
-        public long timestamp;
-        public float remainingFraction;
-        public float usedPercent;
-        public String sessionInfo;
+        public final long timestamp;
+        public final float remainingFraction;
+        public final float usedPercent;
+        public final String sessionInfo;
 
         public HistoryEntry(long timestamp, float remainingFraction, float usedPercent, String sessionInfo) {
             this.timestamp = timestamp;
@@ -48,12 +48,12 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
         }
 
         public String formatDateTime() {
-            SimpleDateFormat sdf = new SimpleDateFormat("dd.MM. HH:mm", Locale.GERMAN);
+            SimpleDateFormat sdf = new SimpleDateFormat("dd.MM. HH:mm", AppI18n.getLocale());
             return sdf.format(new Date(timestamp));
         }
 
         public String formatTimeOnly() {
-            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.GERMAN);
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", AppI18n.getLocale());
             return sdf.format(new Date(timestamp));
         }
     }
@@ -72,7 +72,7 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
                 COL_USED_PCT + " REAL NOT NULL, " +
                 COL_SESSION_INFO + " TEXT" +
                 ");");
-        db.execSQL("CREATE INDEX idx_bucket_time ON " + TABLE_HISTORY + " (" + COL_BUCKET_ID + ", " + COL_TIMESTAMP + ");");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_bucket_time ON " + TABLE_HISTORY + " (" + COL_BUCKET_ID + ", " + COL_TIMESTAMP + ");");
     }
 
     @Override
@@ -81,17 +81,21 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
         onCreate(db);
     }
 
+    /**
+     * Records an authentic, genuine snapshot measured from the real API response.
+     * No synthetic or interpolated values are ever inserted.
+     */
     public synchronized void recordSnapshot(QuotaBucket bucket) {
         if (bucket == null || bucket.bucketId == null) return;
 
         long now = System.currentTimeMillis();
         float remaining = bucket.remainingFraction;
         float usedPct = (1.0f - remaining) * 100f;
-        String session = bucket.getActiveSessionDescription();
+        String info = bucket.groupName != null ? bucket.groupName : "";
 
         SQLiteDatabase db = getWritableDatabase();
 
-        // Check last recorded entry to avoid identical duplicate noise within 30s
+        // Avoid identical duplicate snapshots within 30 seconds
         Cursor c = db.rawQuery("SELECT " + COL_TIMESTAMP + ", " + COL_REMAINING + " FROM " + TABLE_HISTORY +
                 " WHERE " + COL_BUCKET_ID + " = ? ORDER BY " + COL_TIMESTAMP + " DESC LIMIT 1",
                 new String[]{bucket.bucketId});
@@ -101,7 +105,7 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
             float lastRem = c.getFloat(1);
             c.close();
             if (now - lastTime < 30000L && Math.abs(remaining - lastRem) < 0.005f) {
-                return; // Duplicate / no meaningful change within 30 seconds
+                return; // Duplicate within 30 seconds with no change
             }
         } else {
             c.close();
@@ -112,17 +116,20 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
         cv.put(COL_TIMESTAMP, now);
         cv.put(COL_REMAINING, remaining);
         cv.put(COL_USED_PCT, usedPct);
-        cv.put(COL_SESSION_INFO, session);
+        cv.put(COL_SESSION_INFO, info);
 
         db.insert(TABLE_HISTORY, null, cv);
 
-        // Keep maximum 500 entries per bucket
+        // Keep maximum 500 real snapshots per bucket to prevent database bloat
         db.execSQL("DELETE FROM " + TABLE_HISTORY + " WHERE " + COL_BUCKET_ID + " = ? AND " +
                 COL_ID + " NOT IN (SELECT " + COL_ID + " FROM " + TABLE_HISTORY +
                 " WHERE " + COL_BUCKET_ID + " = ? ORDER BY " + COL_TIMESTAMP + " DESC LIMIT 500)",
                 new Object[]{bucket.bucketId, bucket.bucketId});
     }
 
+    /**
+     * Retrieves actual recorded history entries since the specified timestamp.
+     */
     public synchronized List<HistoryEntry> getHistory(String bucketId, long sinceMillis) {
         List<HistoryEntry> list = new ArrayList<>();
         if (bucketId == null) return list;
@@ -138,91 +145,5 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
         c.close();
 
         return list;
-    }
-
-    /**
-     * Checks if tokens are actively being consumed based on recent snapshots.
-     * Returns true if there was a drop in remaining quota within the last 15 minutes.
-     */
-    public synchronized boolean isActivelyBurningTokens(String bucketId, float currentRemaining) {
-        if (currentRemaining >= 0.999f) {
-            return false; // 100% full, definitely idle
-        }
-
-        long now = System.currentTimeMillis();
-        long fifteenMinAgo = now - (15L * 60L * 1000L);
-
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor c = db.rawQuery("SELECT " + COL_REMAINING + " FROM " + TABLE_HISTORY +
-                " WHERE " + COL_BUCKET_ID + " = ? AND " + COL_TIMESTAMP + " >= ? ORDER BY " + COL_TIMESTAMP + " ASC LIMIT 1",
-                new String[]{bucketId, String.valueOf(fifteenMinAgo)});
-
-        boolean burning = false;
-        if (c.moveToFirst()) {
-            float olderRemaining = c.getFloat(0);
-            // If quota decreased by at least 0.5% in the last 15 minutes, tokens were burned
-            if (olderRemaining - currentRemaining > 0.005f) {
-                burning = true;
-            }
-        }
-        c.close();
-
-        // If no prior history existed yet, but utilization is non-zero, assume active if under 5h window
-        return burning;
-    }
-
-    /**
-     * Generates a realistic historical baseline if database was newly created,
-     * so that the user immediately has an informative chart on the first launch.
-     */
-    public synchronized void seedInitialHistoryIfEmpty(QuotaBucket b) {
-        if (b == null || b.bucketId == null) return;
-
-        SQLiteDatabase db = getWritableDatabase();
-        Cursor c = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_HISTORY + " WHERE " + COL_BUCKET_ID + " = ?", new String[]{b.bucketId});
-        boolean empty = true;
-        if (c.moveToFirst()) {
-            empty = c.getInt(0) == 0;
-        }
-        c.close();
-
-        if (!empty) return;
-
-        long now = System.currentTimeMillis();
-        float curRem = b.remainingFraction;
-
-        // Create 6 realistic history points over the last 12-24 hours
-        long[] timeOffsets = new long[]{
-                24L * 3600L * 1000L,
-                18L * 3600L * 1000L,
-                12L * 3600L * 1000L,
-                6L * 3600L * 1000L,
-                2L * 3600L * 1000L,
-                15L * 60L * 1000L
-        };
-
-        float startRem = Math.min(1.0f, curRem + 0.35f);
-        float step = (startRem - curRem) / timeOffsets.length;
-
-        for (int i = 0; i < timeOffsets.length; i++) {
-            long t = now - timeOffsets[i];
-            float r = Math.max(0.0f, Math.min(1.0f, startRem - (step * i)));
-            ContentValues cv = new ContentValues();
-            cv.put(COL_BUCKET_ID, b.bucketId);
-            cv.put(COL_TIMESTAMP, t);
-            cv.put(COL_REMAINING, r);
-            cv.put(COL_USED_PCT, (1.0f - r) * 100f);
-            cv.put(COL_SESSION_INFO, b.getActiveSessionDescription());
-            db.insert(TABLE_HISTORY, null, cv);
-        }
-
-        // Current snapshot
-        ContentValues cv = new ContentValues();
-        cv.put(COL_BUCKET_ID, b.bucketId);
-        cv.put(COL_TIMESTAMP, now);
-        cv.put(COL_REMAINING, curRem);
-        cv.put(COL_USED_PCT, (1.0f - curRem) * 100f);
-        cv.put(COL_SESSION_INFO, b.getActiveSessionDescription());
-        db.insert(TABLE_HISTORY, null, cv);
     }
 }

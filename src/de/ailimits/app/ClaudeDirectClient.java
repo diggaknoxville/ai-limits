@@ -211,7 +211,7 @@ public class ClaudeDirectClient {
     }
 
     public static QuotaGroup parseClaudeUsage(JSONObject data) {
-        QuotaGroup group = new QuotaGroup("Claude Pro (Anthropic)", "Offizieller Claude Pro Account • Cloud-Direktabruf (ohne PC)");
+        QuotaGroup group = new QuotaGroup("Claude Pro (Anthropic)", "Official Claude Pro Account • Direct Cloud API");
 
         // 5-Hour Limit
         JSONObject fiveH = data.optJSONObject("five_hour");
@@ -221,13 +221,13 @@ public class ClaudeDirectClient {
 
             QuotaBucket b5h = new QuotaBucket();
             b5h.bucketId = "claude_pro_5h";
-            b5h.displayName = "Claude Pro 5-Stunden Limit";
+            b5h.displayName = "Claude Pro 5-Hour Limit";
             b5h.window = "5h";
             b5h.remainingFraction = (float) Math.max(0.0, Math.min(1.0, (100.0 - util) / 100.0));
             b5h.rawResetTime = resetsAt;
             b5h.resetTimeMillis = QuotaBucket.parseIsoTime(resetsAt);
             b5h.groupName = group.displayName;
-            b5h.description = String.format(java.util.Locale.GERMAN, "%.0f%% verbraucht (%.0f%% verbleibend)", util, (100.0 - util));
+            b5h.description = String.format(java.util.Locale.US, "%.0f%% used (%.0f%% remaining)", util, (100.0 - util));
 
             group.buckets.add(b5h);
         }
@@ -240,13 +240,13 @@ public class ClaudeDirectClient {
 
             QuotaBucket b7d = new QuotaBucket();
             b7d.bucketId = "claude_pro_7d";
-            b7d.displayName = "Claude Pro Wochenlimit (7 Tage)";
+            b7d.displayName = "Claude Pro Weekly Limit (7-Day)";
             b7d.window = "weekly";
             b7d.remainingFraction = (float) Math.max(0.0, Math.min(1.0, (100.0 - util) / 100.0));
             b7d.rawResetTime = resetsAt;
             b7d.resetTimeMillis = QuotaBucket.parseIsoTime(resetsAt);
             b7d.groupName = group.displayName;
-            b7d.description = String.format(java.util.Locale.GERMAN, "%.0f%% verbraucht (%.0f%% verbleibend)", util, (100.0 - util));
+            b7d.description = String.format(java.util.Locale.US, "%.0f%% used (%.0f%% remaining)", util, (100.0 - util));
 
             group.buckets.add(b7d);
         }

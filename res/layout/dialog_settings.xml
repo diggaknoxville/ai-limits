@@ -11,36 +11,137 @@
         android:padding="20dp">
 
         <TextView
+            android:id="@+id/tvSettingsTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="AI Accounts &amp; Einstellungen"
+            android:text="Settings &amp; AI Accounts"
             android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/tvSettingsSubtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Verbindung zu Claude Pro Cloud, Google Cloud &amp; Benachrichtigungen."
+            android:text="Languages, visual themes, cloud connections and alerts."
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
-        <!-- SECTION 1: Claude Pro Cloud Direct -->
+        <!-- SECTION 1: Language Switcher -->
         <TextView
+            android:id="@+id/tvSectionLanguage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="1. Claude Pro (Anthropic Direkt • Unterwegs)"
+            android:text="1. Language / Sprache / Langue"
+            android:textColor="@color/card_border_highlight"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgLanguage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp">
+
+            <RadioButton
+                android:id="@+id/rbLangEn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="English 🇬🇧"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/rbLangDe"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Deutsch 🇩🇪"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/rbLangFr"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Français 🇫🇷"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </RadioGroup>
+
+        <!-- SECTION 2: Visual Themes -->
+        <TextView
+            android:id="@+id/tvSectionTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="2. App Theme &amp; Design"
+            android:textColor="@color/card_border_highlight"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp">
+
+            <RadioButton
+                android:id="@+id/rbThemeCyberpunk"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🌌 Cyberpunk Dark (Default)"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/rbThemeOled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="🖤 OLED Pure Black (Battery Saver)"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/rbThemeOcean"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="🌊 Deep Ocean Navy"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <RadioButton
+                android:id="@+id/rbThemeEmerald"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="🌲 Emerald Matrix"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </RadioGroup>
+
+        <!-- SECTION 3: Claude Pro Cloud Direct -->
+        <TextView
+            android:id="@+id/tvSectionClaude"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="3. Claude Pro (Anthropic Direct • Anywhere)"
             android:textColor="@color/card_border_highlight"
             android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/tvClaudeDirectDesc"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Funktioniert weltweit über Mobilfunk/WLAN ohne PC."
+            android:text="Connects directly to Anthropic OAuth API without local PC."
             android:textColor="@color/text_muted"
             android:textSize="11sp" />
 
@@ -62,16 +163,17 @@
             android:layout_height="36dp"
             android:layout_marginTop="6dp"
             android:background="@drawable/button_secondary_background"
-            android:text="Claude Cloud prüfen (api.anthropic.com)"
+            android:text="Verify Claude Cloud (api.anthropic.com)"
             android:textColor="@color/text_primary"
             android:textSize="12sp" />
 
-        <!-- SECTION 2: Google Cloud Direct & Account -->
+        <!-- SECTION 4: Google Cloud Direct & Account -->
         <TextView
+            android:id="@+id/tvSectionGoogle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="2. Google Account (Cloud Direkt • Unterwegs)"
+            android:text="4. Google Account (Cloud Direct • Anywhere)"
             android:textColor="@color/card_border_highlight"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -81,7 +183,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:text="Direktabruf über Google Cloud OAuth Console."
+            android:text="Direct quota queries against Google Cloud Developer Console."
             android:textColor="@color/text_muted"
             android:textSize="11sp" />
 
@@ -103,16 +205,17 @@
             android:layout_height="36dp"
             android:layout_marginTop="6dp"
             android:background="@drawable/button_secondary_background"
-            android:text="Google Cloud prüfen (oauth2.googleapis.com)"
+            android:text="Verify Google Cloud (oauth2.googleapis.com)"
             android:textColor="@color/text_primary"
             android:textSize="12sp" />
 
-        <!-- SECTION 3: Antigravity Local Bridge -->
+        <!-- SECTION 5: Antigravity Desktop-Bridge -->
         <TextView
+            android:id="@+id/tvSectionBridge"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="3. Antigravity Desktop-Bridge (Optional)"
+            android:text="5. Antigravity Desktop-Bridge (Optional / Local)"
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -161,31 +264,23 @@
             android:textColorHint="@color/text_muted"
             android:textSize="11sp" />
 
-        <!-- SECTION 4: Theme & Notification Settings (Features 6, 8, 9) -->
+        <!-- SECTION 6: Notification Settings -->
         <TextView
+            android:id="@+id/tvSectionNotifications"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="4. Features &amp; Benachrichtigungen"
+            android:text="6. Notification Options"
             android:textColor="@color/card_border_highlight"
             android:textSize="13sp"
             android:textStyle="bold" />
-
-        <CheckBox
-            android:id="@+id/cbOledMode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Pure OLED Black Modus (Akkusparen auf Volla Phone)"
-            android:textColor="@color/text_primary"
-            android:textSize="12sp" />
 
         <CheckBox
             android:id="@+id/cbNotifyLow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="true"
-            android:text="Frühwarnung bei &lt; 15% (Limit fast voll)"
+            android:text="Early warning below 15% quota remaining"
             android:textColor="@color/text_primary"
             android:textSize="12sp" />
 
@@ -194,7 +289,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="true"
-            android:text="Erinnerung bei 100% vollständigem Reset"
+            android:text="Alert on 100% full quota restoration"
             android:textColor="@color/text_primary"
             android:textSize="12sp" />
 
@@ -211,7 +306,7 @@
                 android:layout_height="36dp"
                 android:layout_weight="1"
                 android:background="@drawable/button_secondary_background"
-                android:text="Bridge prüfen"
+                android:text="Test Bridge"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
 
@@ -222,7 +317,7 @@
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:background="@drawable/button_secondary_background"
-                android:text="🔔 Test-Alarm"
+                android:text="🔔 Test Alert"
                 android:textColor="@color/text_primary"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -240,7 +335,7 @@
                 android:layout_height="44dp"
                 android:layout_weight="1"
                 android:background="@drawable/button_secondary_background"
-                android:text="Abbrechen"
+                android:text="Cancel"
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
@@ -251,7 +346,7 @@
                 android:layout_marginStart="10dp"
                 android:layout_weight="1"
                 android:background="@drawable/button_background"
-                android:text="Speichern"
+                android:text="Save Settings"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 android:textStyle="bold" />

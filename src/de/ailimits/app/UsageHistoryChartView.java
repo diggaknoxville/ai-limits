@@ -14,7 +14,6 @@ import android.view.View;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class UsageHistoryChartView extends View {
 
@@ -29,7 +28,7 @@ public class UsageHistoryChartView extends View {
     private final Path fillPath = new Path();
 
     private List<QuotaHistoryManager.HistoryEntry> entries = new ArrayList<>();
-    private int themeColor = 0xFF38BDF8; // Default Neon Cyan
+    private int themeColor = 0xFF38BDF8;
 
     public UsageHistoryChartView(Context context) {
         super(context);
@@ -118,9 +117,46 @@ public class UsageHistoryChartView extends View {
             canvas.drawText(pct + "%", padLeft - dpToPx(6), y + dpToPx(3.5f), textPaint);
         }
 
+        // Empty state
         if (entries == null || entries.isEmpty()) {
             textPaint.setTextAlign(Paint.Align.CENTER);
-            canvas.drawText("Keine Verlaufsdaten vorhanden", padLeft + plotW / 2f, padTop + plotH / 2f, textPaint);
+            textPaint.setColor(0xFF64748B);
+            canvas.drawText(AppI18n.getTimelineEmpty(), padLeft + plotW / 2f, padTop + plotH / 2f, textPaint);
+            textPaint.setTextAlign(Paint.Align.RIGHT);
+            return;
+        }
+
+        // Single entry state
+        if (entries.size() == 1) {
+            QuotaHistoryManager.HistoryEntry single = entries.get(0);
+            float y = padTop + (1.0f - single.remainingFraction) * plotH;
+
+            // Draw line across
+            linePaint.setAlpha(120);
+            canvas.drawLine(padLeft, y, w - padRight, y, linePaint);
+            linePaint.setAlpha(255);
+
+            // Centered point
+            float cx = padLeft + plotW / 2f;
+            pointPaint.setColor(themeColor);
+            canvas.drawCircle(cx, y, dpToPx(5), pointPaint);
+            pointPaint.setColor(Color.WHITE);
+            canvas.drawCircle(cx, y, dpToPx(2.5f), pointPaint);
+
+            // Callout badge
+            int remPct = Math.round(single.remainingFraction * 100f);
+            String callout = remPct + "%";
+            pointPaint.setColor(0xFF0F172A);
+            float bw = dpToPx(44);
+            float bh = dpToPx(18);
+            canvas.drawRoundRect(cx - bw / 2f, y - dpToPx(22), cx + bw / 2f, y - dpToPx(4), dpToPx(4), dpToPx(4), pointPaint);
+            textPaint.setColor(0xFFF8FAFC);
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText(callout, cx, y - dpToPx(10), textPaint);
+
+            // Subtitle hint
+            labelPaint.setColor(0xFF64748B);
+            canvas.drawText(single.formatDateTime() + " • " + AppI18n.getTimelineOnePoint(), padLeft + plotW / 2f, h - dpToPx(6), labelPaint);
             textPaint.setTextAlign(Paint.Align.RIGHT);
             return;
         }
@@ -177,54 +213,52 @@ public class UsageHistoryChartView extends View {
 
             // Point outer ring
             pointPaint.setColor(themeColor);
-            canvas.drawCircle(x, y, dpToPx(4), pointPaint);
+            canvas.drawCircle(x, y, dpToPx(3.5f), pointPaint);
             // Point inner dot
             pointPaint.setColor(Color.WHITE);
-            canvas.drawCircle(x, y, dpToPx(2), pointPaint);
+            canvas.drawCircle(x, y, dpToPx(1.5f), pointPaint);
         }
 
         // Draw Latest Point Callout
-        if (!entries.isEmpty()) {
-            QuotaHistoryManager.HistoryEntry latest = entries.get(entries.size() - 1);
-            int remPct = Math.round(latest.remainingFraction * 100f);
-            String callout = remPct + "% frei";
+        QuotaHistoryManager.HistoryEntry latest = entries.get(entries.size() - 1);
+        int remPct = Math.round(latest.remainingFraction * 100f);
+        String callout = remPct + "%";
 
-            pointPaint.setColor(0xFF0F172A);
-            pointPaint.setStyle(Paint.Style.FILL);
-            float calloutW = dpToPx(48);
-            float calloutH = dpToPx(18);
-            float calloutX = Math.min(w - padRight - calloutW, Math.max(padLeft, lastX - calloutW / 2f));
-            float calloutY = Math.max(padTop - dpToPx(12), lastY - dpToPx(24));
+        pointPaint.setColor(0xFF0F172A);
+        pointPaint.setStyle(Paint.Style.FILL);
+        float calloutW = dpToPx(44);
+        float calloutH = dpToPx(18);
+        float calloutX = Math.min(w - padRight - calloutW, Math.max(padLeft, lastX - calloutW / 2f));
+        float calloutY = Math.max(padTop - dpToPx(12), lastY - dpToPx(24));
 
-            canvas.drawRoundRect(calloutX, calloutY, calloutX + calloutW, calloutY + calloutH, dpToPx(4), dpToPx(4), pointPaint);
-            pointPaint.setColor(themeColor);
-            pointPaint.setStyle(Paint.Style.STROKE);
-            pointPaint.setStrokeWidth(dpToPx(1));
-            canvas.drawRoundRect(calloutX, calloutY, calloutX + calloutW, calloutY + calloutH, dpToPx(4), dpToPx(4), pointPaint);
-            pointPaint.setStyle(Paint.Style.FILL);
+        canvas.drawRoundRect(calloutX, calloutY, calloutX + calloutW, calloutY + calloutH, dpToPx(4), dpToPx(4), pointPaint);
+        pointPaint.setColor(themeColor);
+        pointPaint.setStyle(Paint.Style.STROKE);
+        pointPaint.setStrokeWidth(dpToPx(1));
+        canvas.drawRoundRect(calloutX, calloutY, calloutX + calloutW, calloutY + calloutH, dpToPx(4), dpToPx(4), pointPaint);
+        pointPaint.setStyle(Paint.Style.FILL);
 
-            textPaint.setColor(0xFFF8FAFC);
-            textPaint.setTextAlign(Paint.Align.CENTER);
-            canvas.drawText(callout, calloutX + calloutW / 2f, calloutY + dpToPx(12), textPaint);
-            textPaint.setTextAlign(Paint.Align.RIGHT);
-        }
+        textPaint.setColor(0xFFF8FAFC);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(callout, calloutX + calloutW / 2f, calloutY + dpToPx(12), textPaint);
+        textPaint.setTextAlign(Paint.Align.RIGHT);
 
         // 6. Draw X-Axis Time Labels
-        if (!entries.isEmpty()) {
-            String startTimeStr = entries.get(0).formatTimeOnly();
-            String endTimeStr = "Jetzt (" + entries.get(entries.size() - 1).formatTimeOnly() + ")";
-            canvas.drawText(startTimeStr, padLeft + dpToPx(10), h - dpToPx(6), labelPaint);
+        String startTimeStr = entries.get(0).formatTimeOnly();
+        String endTimeStr = entries.get(entries.size() - 1).formatTimeOnly();
+        labelPaint.setTextAlign(Paint.Align.LEFT);
+        canvas.drawText(startTimeStr, padLeft, h - dpToPx(6), labelPaint);
 
-            if (entries.size() > 2) {
-                int midIdx = entries.size() / 2;
-                String midTimeStr = entries.get(midIdx).formatTimeOnly();
-                float midRatio = (float) (entries.get(midIdx).timestamp - minTime) / (float) timeSpan;
-                canvas.drawText(midTimeStr, padLeft + midRatio * plotW, h - dpToPx(6), labelPaint);
-            }
-
-            labelPaint.setTextAlign(Paint.Align.RIGHT);
-            canvas.drawText(endTimeStr, w - padRight, h - dpToPx(6), labelPaint);
+        if (entries.size() > 2) {
+            int midIdx = entries.size() / 2;
+            String midTimeStr = entries.get(midIdx).formatTimeOnly();
+            float midRatio = (float) (entries.get(midIdx).timestamp - minTime) / (float) timeSpan;
             labelPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText(midTimeStr, padLeft + midRatio * plotW, h - dpToPx(6), labelPaint);
         }
+
+        labelPaint.setTextAlign(Paint.Align.RIGHT);
+        canvas.drawText(endTimeStr, w - padRight, h - dpToPx(6), labelPaint);
+        labelPaint.setTextAlign(Paint.Align.CENTER);
     }
 }

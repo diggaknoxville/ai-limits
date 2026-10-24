@@ -89,7 +89,7 @@ public class QuotaHistoryManager extends SQLiteOpenHelper {
         if (bucket == null || bucket.bucketId == null) return;
 
         long now = System.currentTimeMillis();
-        float remaining = bucket.remainingFraction;
+        float remaining = bucket.getRemainingFraction();
         float usedPct = (1.0f - remaining) * 100f;
         String info = bucket.groupName != null ? bucket.groupName : "";
 

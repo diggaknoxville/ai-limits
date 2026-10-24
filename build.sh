@@ -43,7 +43,7 @@ echo "=== 2. Linking resources with aapt2 ==="
     build/compiled_res/res.zip
 
 echo "=== 3. Compiling Java sources with javac ==="
-javac --release 11 \
+javac -source 11 -target 11 \
     -cp "$PLATFORM" \
     -d build/obj \
     build/gen/de/ailimits/app/R.java \

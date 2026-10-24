@@ -1,0 +1,361 @@
+package de.ailimits.app;
+
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
+import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.ParcelUuid;
+import android.util.Log;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+public class WatchBleSyncManager {
+    private static final String TAG = "WatchBleSync";
+
+    public static final String WATCH_NAME = "WatchOS Ultra";
+    public static final UUID SERVICE_AI_LIMITS = UUID.fromString("0000a100-0000-1000-8000-00805f9b34fb");
+    public static final UUID CHAR_DATA = UUID.fromString("0000a101-0000-1000-8000-00805f9b34fb");
+
+    private static WatchBleSyncManager instance;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    private BluetoothGatt connectedGatt = null;
+    private boolean isScanning = false;
+    private byte[] pendingPayload = null;
+    private SyncCallback activeCallback = null;
+    private BluetoothLeScanner activeScanner = null;
+    private WatchScanCallback activeScanCallback = null;
+
+    public interface SyncCallback {
+        void onSyncSuccess();
+        void onSyncError(String error);
+    }
+
+    public static synchronized WatchBleSyncManager getInstance() {
+        if (instance == null) {
+            instance = new WatchBleSyncManager();
+        }
+        return instance;
+    }
+
+    private WatchBleSyncManager() {}
+
+    public void syncBucketsToWatch(Context context, List<QuotaBucket> buckets, SyncCallback callback) {
+        this.activeCallback = callback;
+        this.pendingPayload = buildBinaryPayload(buckets);
+
+        BluetoothManager bm = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+        if (bm == null) {
+            notifyError("Bluetooth Manager nicht verfügbar");
+            return;
+        }
+
+        BluetoothAdapter adapter = bm.getAdapter();
+        if (adapter == null || !adapter.isEnabled()) {
+            notifyError("Bluetooth ist deaktiviert");
+            return;
+        }
+
+        // Check bonded/paired devices first
+        try {
+            for (BluetoothDevice device : adapter.getBondedDevices()) {
+                if (WATCH_NAME.equalsIgnoreCase(device.getName())) {
+                    Log.d(TAG, "Gefunden unter gekoppelten Geräten: " + device.getAddress());
+                    connectToDevice(context, device);
+                    return;
+                }
+            }
+        } catch (SecurityException ignored) {}
+
+        // Otherwise scan via BLE
+        startScan(context, adapter);
+    }
+
+    private void startScan(Context context, BluetoothAdapter adapter) {
+        BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
+        if (scanner == null) {
+            notifyError("BLE Scanner nicht verfügbar");
+            return;
+        }
+
+        if (isScanning) return;
+        isScanning = true;
+        activeScanner = scanner;
+
+        ScanFilter nameFilter = new ScanFilter.Builder()
+                .setDeviceName(WATCH_NAME)
+                .build();
+        ScanFilter uuidFilter = new ScanFilter.Builder()
+                .setServiceUuid(new ParcelUuid(SERVICE_AI_LIMITS))
+                .build();
+        List<ScanFilter> filters = new ArrayList<>();
+        filters.add(nameFilter);
+        filters.add(uuidFilter);
+
+        ScanSettings settings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build();
+
+        activeScanCallback = new WatchScanCallback(this, context);
+
+        try {
+            scanner.startScan(filters, settings, activeScanCallback);
+            handler.postDelayed(new ScanTimeoutRunnable(this), 8000);
+        } catch (SecurityException e) {
+            isScanning = false;
+            notifyError("Berechtigung fehlt: " + e.getMessage());
+        }
+    }
+
+    private static class ScanTimeoutRunnable implements Runnable {
+        private final WatchBleSyncManager manager;
+        ScanTimeoutRunnable(WatchBleSyncManager manager) { this.manager = manager; }
+        @Override
+        public void run() {
+            if (manager.isScanning) {
+                manager.stopScan();
+                manager.notifyError("WatchOS Ultra nicht in Reichweite gefunden");
+            }
+        }
+    }
+
+    private void stopScan() {
+        if (!isScanning) return;
+        isScanning = false;
+        if (activeScanner != null && activeScanCallback != null) {
+            try {
+                activeScanner.stopScan(activeScanCallback);
+            } catch (Exception ignored) {}
+        }
+        activeScanner = null;
+        activeScanCallback = null;
+    }
+
+    private static class WatchScanCallback extends ScanCallback {
+        private final WatchBleSyncManager manager;
+        private final Context context;
+
+        WatchScanCallback(WatchBleSyncManager manager, Context context) {
+            this.manager = manager;
+            this.context = context;
+        }
+
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            BluetoothDevice dev = result.getDevice();
+            try {
+                String name = dev.getName();
+                if (WATCH_NAME.equalsIgnoreCase(name) || (result.getScanRecord() != null && result.getScanRecord().getServiceUuids() != null && result.getScanRecord().getServiceUuids().contains(new ParcelUuid(SERVICE_AI_LIMITS)))) {
+                    manager.stopScan();
+                    Log.d(TAG, "WatchOS Ultra per Scan entdeckt: " + dev.getAddress());
+                    manager.connectToDevice(context, dev);
+                }
+            } catch (SecurityException ignored) {}
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            manager.isScanning = false;
+            Log.e(TAG, "BLE Scan fehlgeschlagen: " + errorCode);
+            manager.notifyError("Scan-Fehler: " + errorCode);
+        }
+    }
+
+    private void connectToDevice(Context context, BluetoothDevice device) {
+        try {
+            connectedGatt = device.connectGatt(context, false, new WatchGattCallback(this));
+        } catch (SecurityException e) {
+            notifyError("GATT Verbindung fehlgeschlagen: " + e.getMessage());
+        }
+    }
+
+    private static class WatchGattCallback extends BluetoothGattCallback {
+        private final WatchBleSyncManager manager;
+
+        WatchGattCallback(WatchBleSyncManager manager) {
+            this.manager = manager;
+        }
+
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.d(TAG, "Mit WatchOS Ultra verbunden, starte Service-Discovery...");
+                try {
+                    gatt.discoverServices();
+                } catch (SecurityException ignored) {}
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d(TAG, "WatchOS Ultra getrennt.");
+                gatt.close();
+                manager.connectedGatt = null;
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                BluetoothGattService service = gatt.getService(SERVICE_AI_LIMITS);
+                if (service != null) {
+                    BluetoothGattCharacteristic charData = service.getCharacteristic(CHAR_DATA);
+                    if (charData != null && manager.pendingPayload != null) {
+                        try {
+                            charData.setValue(manager.pendingPayload);
+                            charData.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                            boolean ok = gatt.writeCharacteristic(charData);
+                            Log.d(TAG, "Datenübertragung gestartet: " + ok);
+                            return;
+                        } catch (SecurityException ignored) {}
+                    }
+                }
+            }
+            manager.disconnectGatt(gatt);
+            manager.notifyError("AI Limits Service auf der Uhr nicht gefunden");
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            manager.disconnectGatt(gatt);
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(TAG, "Quota-Daten erfolgreich an WatchOS Ultra übertragen!");
+                manager.notifySuccess();
+            } else {
+                Log.e(TAG, "Schreibfehler auf Charakteristik: " + status);
+                manager.notifyError("Schreibfehler: " + status);
+            }
+        }
+    }
+
+    private void disconnectGatt(BluetoothGatt gatt) {
+        try {
+            gatt.disconnect();
+            gatt.close();
+        } catch (Exception ignored) {}
+        connectedGatt = null;
+    }
+
+    private static class NotifySuccessRunnable implements Runnable {
+        private final SyncCallback callback;
+        NotifySuccessRunnable(SyncCallback cb) { this.callback = cb; }
+        @Override
+        public void run() { if (callback != null) callback.onSyncSuccess(); }
+    }
+
+    private static class NotifyErrorRunnable implements Runnable {
+        private final SyncCallback callback;
+        private final String error;
+        NotifyErrorRunnable(SyncCallback cb, String err) { this.callback = cb; this.error = err; }
+        @Override
+        public void run() { if (callback != null) callback.onSyncError(error); }
+    }
+
+    private void notifySuccess() {
+        if (activeCallback != null) {
+            handler.post(new NotifySuccessRunnable(activeCallback));
+        }
+    }
+
+    private void notifyError(final String error) {
+        if (activeCallback != null) {
+            handler.post(new NotifyErrorRunnable(activeCallback, error));
+        }
+    }
+
+    private byte[] buildBinaryPayload(List<QuotaBucket> buckets) {
+        // Matches struct AiLimitsBlePacket (56 bytes, little endian)
+        ByteBuffer buf = ByteBuffer.allocate(56);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
+        buf.put((byte) 0xA1); // Magic
+        buf.put((byte) 0x01); // Version
+
+        int c5h_p = 100, cWk_p = 100;
+        long c5h_r = 0, cWk_r = 0;
+        int agG5h_p = 100, agGWk_p = 100;
+        long agG5h_r = 0, agGWk_r = 0;
+        int agC5h_p = 100, agCWk_p = 100;
+        long agC5h_r = 0, agCWk_r = 0;
+        int gc5h_p = 100, gcDay_p = 100, gcWk_p = 100;
+        long gc5h_r = 0, gcDay_r = 0, gcWk_r = 0;
+        int argon_p = 100;
+        long argon_r = 0;
+
+        if (buckets != null) {
+            for (QuotaBucket b : buckets) {
+                String bid = b.bucketId != null ? b.bucketId.toLowerCase(java.util.Locale.ROOT) : "";
+                int pct = Math.round(b.getRemainingFraction() * 100f);
+                long rSec = b.resetTimeMillis / 1000L;
+
+                // 1. Claude Pro Direct API
+                if ("claude_pro_5h".equals(bid) || (bid.startsWith("claude") && bid.contains("5h"))) {
+                    c5h_p = pct; c5h_r = rSec;
+                } else if ("claude_pro_7d".equals(bid) || (bid.startsWith("claude") && (bid.contains("7d") || bid.contains("week")))) {
+                    cWk_p = pct; cWk_r = rSec;
+                }
+                // 2. Google Antigravity IDE Models
+                else if ("gemini-argon-wtu-weekly".equals(bid) || bid.contains("argon")) {
+                    argon_p = pct; argon_r = rSec;
+                } else if ("gemini-5h".equals(bid)) {
+                    agG5h_p = pct; agG5h_r = rSec;
+                } else if ("gemini-weekly".equals(bid)) {
+                    agGWk_p = pct; agGWk_r = rSec;
+                } else if ("3p-5h".equals(bid)) {
+                    agC5h_p = pct; agC5h_r = rSec;
+                } else if ("3p-weekly".equals(bid)) {
+                    agCWk_p = pct; agCWk_r = rSec;
+                }
+                // 3. Google Cloud Direct API
+                else if ("google_gemini_cloud_pro".equals(bid) || bid.contains("cloud_pro")) {
+                    gc5h_p = pct; gc5h_r = rSec;
+                } else if ("google_gemini_daily".equals(bid) || bid.contains("daily")) {
+                    gcDay_p = pct; gcDay_r = rSec;
+                } else if ("google_gemini_flash".equals(bid) || bid.contains("flash")) {
+                    gcWk_p = pct; gcWk_r = rSec;
+                }
+            }
+        }
+
+        buf.put((byte) c5h_p);
+        buf.putInt((int) c5h_r);
+        buf.put((byte) cWk_p);
+        buf.putInt((int) cWk_r);
+
+        buf.put((byte) agG5h_p);
+        buf.putInt((int) agG5h_r);
+        buf.put((byte) agGWk_p);
+        buf.putInt((int) agGWk_r);
+
+        buf.put((byte) agC5h_p);
+        buf.putInt((int) agC5h_r);
+        buf.put((byte) agCWk_p);
+        buf.putInt((int) agCWk_r);
+
+        buf.put((byte) gc5h_p);
+        buf.putInt((int) gc5h_r);
+        buf.put((byte) gcDay_p);
+        buf.putInt((int) gcDay_r);
+        buf.put((byte) gcWk_p);
+        buf.putInt((int) gcWk_r);
+
+        buf.put((byte) argon_p);
+        buf.putInt((int) argon_r);
+
+        buf.putInt((int) (System.currentTimeMillis() / 1000L)); // sync_timestamp
+
+        return buf.array();
+    }
+}

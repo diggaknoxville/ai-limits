@@ -14,6 +14,7 @@ public class QuotaBucket {
     public String rawResetTime;
     public long resetTimeMillis;
     public String groupName;
+    public boolean disabled;
 
     public QuotaBucket() {}
 
@@ -65,11 +66,20 @@ public class QuotaBucket {
         return 5L * 3600L * 1000L;
     }
 
+    public float getRemainingFraction() {
+        if (disabled) return 0.0f;
+        if (resetTimeMillis > 0 && System.currentTimeMillis() >= resetTimeMillis) {
+            return 1.0f;
+        }
+        return remainingFraction;
+    }
+
     public float getRecoveryFraction() {
+        if (disabled) return 0.0f;
         if (resetTimeMillis <= 0) return 1.0f;
         long now = System.currentTimeMillis();
         long diff = resetTimeMillis - now;
-        if (diff <= 0 || remainingFraction >= 0.999f) return 1.0f;
+        if (diff <= 0 || getRemainingFraction() >= 0.999f) return 1.0f;
 
         long total = getTotalWindowMillis();
         float elapsedRatio = 1.0f - ((float) diff / (float) total);
@@ -135,9 +145,18 @@ public class QuotaBucket {
     }
 
     public String formatCountdown() {
+        if (disabled) {
+            String lang = AppI18n.getLang();
+            if (AppI18n.LANG_DE.equals(lang)) return "Gesperrt (Wochenlimit)";
+            if (AppI18n.LANG_FR.equals(lang)) return "Verrouillé (Limite hebdo)";
+            return "Locked (Weekly Limit)";
+        }
         if (resetTimeMillis <= 0) return "";
         long now = System.currentTimeMillis();
         long diff = resetTimeMillis - now;
+        if (diff <= 0) {
+            return AppI18n.getCountdownText(0);
+        }
         return AppI18n.getCountdownText(diff);
     }
 }

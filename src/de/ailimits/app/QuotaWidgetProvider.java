@@ -56,6 +56,7 @@ public class QuotaWidgetProvider extends AppWidgetProvider {
                         long m = diffMin % 60;
                         views.setTextViewText(R.id.tvWidgetClaudeTimer, (h > 0 ? h + "h " : "") + m + "m");
                     } else {
+                        views.setTextViewText(R.id.tvWidgetClaudeValue, "100% frei");
                         views.setTextViewText(R.id.tvWidgetClaudeTimer, "Bereit");
                     }
                 }

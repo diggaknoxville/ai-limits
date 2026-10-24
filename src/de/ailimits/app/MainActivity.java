@@ -38,7 +38,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class MainActivity extends Activity implements View.OnClickListener, Runnable,
-        QuotaApiClient.QuotaCallback, ClaudeDirectClient.ClaudeUsageCallback, GoogleDirectClient.GoogleDirectCallback {
+        QuotaApiClient.QuotaCallback, ClaudeDirectClient.ClaudeUsageCallback, GoogleDirectClient.GoogleDirectCallback,
+        WatchBleSyncManager.SyncCallback, OtaUpdateManager.WatchUpdateCallback {
 
     private static final String TAG = "MainActivity";
     private static final String PREF_CONFIG = "ai_limits_config";
@@ -72,6 +73,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
     private LinearLayout llGroupsContainer;
     private Button btnMessageCenter;
     private Button btnShare;
+    private Button btnWatchSync;
     private ImageButton btnRefresh;
     private ImageButton btnSettings;
     private Button btnQuickTimer;
@@ -510,19 +512,22 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         ThemeManager.init(this);
 
         // Pre-seed default tokens if not already saved or empty
-        if (prefs.getString(KEY_CLAUDE_ACCESS_TOKEN, "").isEmpty()) {
-            prefs.edit()
-                    .putString(KEY_CLAUDE_ACCESS_TOKEN, DEFAULT_CLAUDE_ACCESS)
-                    .putString(KEY_CLAUDE_REFRESH_TOKEN, DEFAULT_CLAUDE_REFRESH)
-                    .putString(KEY_GOOGLE_REFRESH_TOKEN, DEFAULT_GOOGLE_REFRESH)
-                    .putString(KEY_HOST, DEFAULT_GOOGLE_HOST)
-                    .putInt(KEY_PORT, DEFAULT_GOOGLE_PORT)
-                    .putString(KEY_TOKEN, DEFAULT_GOOGLE_CSRF)
-                    .putBoolean(KEY_NOTIFY_LOW, true)
-                    .putBoolean(KEY_NOTIFY_FULL, true)
-                    .putString(KEY_VIEW_MODE, "HORIZON")
-                    .putString("last_claude_usage_json", ClaudeDirectClient.getInitialCachedJson())
-                    .apply();
+        SharedPreferences.Editor edit = prefs.edit();
+        boolean needsSave = false;
+        if (!DEFAULT_CLAUDE_ACCESS.isEmpty() && !DEFAULT_CLAUDE_ACCESS.equals(prefs.getString(KEY_CLAUDE_ACCESS_TOKEN, ""))) {
+            edit.putString(KEY_CLAUDE_ACCESS_TOKEN, DEFAULT_CLAUDE_ACCESS);
+            needsSave = true;
+        }
+        if (!DEFAULT_CLAUDE_REFRESH.isEmpty() && !DEFAULT_CLAUDE_REFRESH.equals(prefs.getString(KEY_CLAUDE_REFRESH_TOKEN, ""))) {
+            edit.putString(KEY_CLAUDE_REFRESH_TOKEN, DEFAULT_CLAUDE_REFRESH);
+            needsSave = true;
+        }
+        if (!DEFAULT_GOOGLE_CSRF.isEmpty() && !DEFAULT_GOOGLE_CSRF.equals(prefs.getString(KEY_TOKEN, ""))) {
+            edit.putString(KEY_TOKEN, DEFAULT_GOOGLE_CSRF);
+            needsSave = true;
+        }
+        if (needsSave) {
+            edit.apply();
         }
 
         viewMode = prefs.getString(KEY_VIEW_MODE, "HORIZON");
@@ -535,6 +540,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         llGroupsContainer = findViewById(R.id.llGroupsContainer);
         btnMessageCenter = findViewById(R.id.btnMessageCenter);
         btnShare = findViewById(R.id.btnShare);
+        btnWatchSync = findViewById(R.id.btnWatchSync);
         btnRefresh = findViewById(R.id.btnRefresh);
         btnSettings = findViewById(R.id.btnSettings);
         btnQuickTimer = findViewById(R.id.btnQuickTimer);
@@ -552,6 +558,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         btnMessageCenter.setOnClickListener(this);
         btnShare.setOnClickListener(this);
+        if (btnWatchSync != null) btnWatchSync.setOnClickListener(this);
         btnRefresh.setOnClickListener(this);
         btnSettings.setOnClickListener(this);
         btnQuickTimer.setOnClickListener(this);
@@ -579,6 +586,19 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 101);
             }
         }
+
+        if (Build.VERSION.SDK_INT >= 31) {
+            if (checkSelfPermission("android.permission.BLUETOOTH_SCAN") != PackageManager.PERMISSION_GRANTED ||
+                checkSelfPermission("android.permission.BLUETOOTH_CONNECT") != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{
+                        "android.permission.BLUETOOTH_SCAN",
+                        "android.permission.BLUETOOTH_CONNECT"
+                }, 102);
+            }
+        }
+
+        // Silent background update check
+        OtaUpdateManager.getInstance().checkAppUpdate(this, false);
 
         startTicker();
 
@@ -632,6 +652,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         int id = v.getId();
         if (id == R.id.btnRefresh) {
             loadQuotaData();
+        } else if (id == R.id.btnWatchSync) {
+            triggerWatchSync(true);
+        } else if (id == R.id.btnCheckUpdates) {
+            onCheckUpdatesClicked();
         } else if (id == R.id.btnSettings) {
             showSettingsDialog();
         } else if (id == R.id.btnMessageCenter) {
@@ -784,7 +808,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         tickCount++;
         updateTickers();
 
-        if (tickCount % 30 == 0) {
+        if (tickCount % 300 == 0) { // 5-minute periodic refresh to avoid rate limits
             loadQuotaData();
         }
         mainHandler.postDelayed(this, 1000);
@@ -792,20 +816,28 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
     private void updateTickers() {
         for (TickerItem item : tickerItems) {
-            if (item.tvCountdown != null && item.bucket != null) {
-                item.tvCountdown.setText(item.bucket.formatCountdown());
-            }
-            if (item.recoveryBar != null && item.bucket != null) {
-                float recFraction = item.bucket.getRecoveryFraction();
-                item.recoveryBar.setProgress(recFraction);
-                if (item.tvRecoveryRatio != null) {
-                    if (recFraction >= 0.999f) {
-                        item.tvRecoveryRatio.setText("✅ 100% Bereit");
-                        item.tvRecoveryRatio.setTextColor(0xFF10B981);
-                    } else {
-                        int pct = Math.round(recFraction * 100f);
-                        item.tvRecoveryRatio.setText(String.format(Locale.US, "Erholung: %d%%", pct));
-                        item.tvRecoveryRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recFraction));
+            if (item.bucket != null) {
+                if (item.progressView != null) {
+                    item.progressView.setProgress(item.bucket.getRemainingFraction());
+                }
+                if (item.tvCountdown != null) {
+                    item.tvCountdown.setText(item.bucket.formatCountdown());
+                }
+                if (item.recoveryBar != null) {
+                    float recFraction = item.bucket.getRecoveryFraction();
+                    item.recoveryBar.setProgress(recFraction);
+                    if (item.tvRecoveryRatio != null) {
+                        if (item.bucket.disabled) {
+                            item.tvRecoveryRatio.setText("Inaktiv");
+                            item.tvRecoveryRatio.setTextColor(0xFF94A3B8);
+                        } else if (recFraction >= 0.999f) {
+                            item.tvRecoveryRatio.setText(AppI18n.getFullReady());
+                            item.tvRecoveryRatio.setTextColor(0xFF10B981);
+                        } else {
+                            int pct = Math.round(recFraction * 100f);
+                            item.tvRecoveryRatio.setText(AppI18n.getRecoveryPct(pct));
+                            item.tvRecoveryRatio.setTextColor(RecoveryProgressBar.getRecoveryColor(recFraction));
+                        }
                     }
                 }
             }
@@ -834,6 +866,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         String host = prefs.getString(KEY_HOST, DEFAULT_GOOGLE_HOST);
         int port = prefs.getInt(KEY_PORT, DEFAULT_GOOGLE_PORT);
         String token = prefs.getString(KEY_TOKEN, DEFAULT_GOOGLE_CSRF);
+        if (!DEFAULT_GOOGLE_CSRF.isEmpty()) {
+            token = DEFAULT_GOOGLE_CSRF;
+            prefs.edit().putString(KEY_TOKEN, token).apply();
+        }
+        Log.d(TAG, "loadQuotaData -> host: " + host + ", port: " + port + ", token: [" + token + "], DEFAULT_CSRF: [" + DEFAULT_GOOGLE_CSRF + "]");
 
         ClaudeDirectClient.fetchClaudeGroup(this, this);
         GoogleDirectClient.fetchGoogleDirect(this, this);
@@ -955,7 +992,33 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             hist.recordSnapshot(b);
         }
 
+        triggerWatchSync(false);
+
         renderQuotaGroups(combined, googleOverallDescription);
+    }
+
+    private boolean syncUserInitiated = false;
+
+    private void triggerWatchSync(final boolean userInitiated) {
+        this.syncUserInitiated = userInitiated;
+        if (userInitiated) {
+            Toast.makeText(this, "Suche WatchOS Ultra per BLE...", Toast.LENGTH_SHORT).show();
+        }
+        WatchBleSyncManager.getInstance().syncBucketsToWatch(this, collectAllBuckets(), this);
+    }
+
+    @Override
+    public void onSyncSuccess() {
+        if (syncUserInitiated) {
+            mainHandler.post(() -> Toast.makeText(MainActivity.this, "⚡ WatchOS Ultra synchronisiert ✓", Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    @Override
+    public void onSyncError(String error) {
+        if (syncUserInitiated) {
+            mainHandler.post(() -> Toast.makeText(MainActivity.this, "Watch Sync: " + error, Toast.LENGTH_SHORT).show());
+        }
     }
 
     // Build Time-Horizon View (Weekly limits first, then 5h, then daily)
@@ -1177,7 +1240,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 LinearLayout.LayoutParams cpLp = new LinearLayout.LayoutParams(size, size);
                 cpLp.rightMargin = dp(10);
                 cp.setLayoutParams(cpLp);
-                cp.setProgress(bucket.remainingFraction);
+                cp.setProgress(bucket.getRemainingFraction());
                 topRow.addView(cp);
 
                 // 2. RECHTE SPALTE
@@ -1308,14 +1371,18 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
                 final TextView tvCountdown = new TextView(this);
                 tvCountdown.setText(bucket.formatCountdown());
-                tvCountdown.setTextColor(bucket.remainingFraction > 0.5f ? 0xFF10B981 : (bucket.remainingFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444));
+                float remFraction = bucket.getRemainingFraction();
+                tvCountdown.setTextColor(bucket.disabled ? 0xFFEF4444 : (remFraction > 0.5f ? 0xFF10B981 : (remFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444)));
                 tvCountdown.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
                 tvCountdown.setTypeface(null, Typeface.BOLD);
                 LinearLayout.LayoutParams cdLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
                 statusRow.addView(tvCountdown, cdLp);
 
                 final TextView tvRecoveryRatio = new TextView(this);
-                if (recoveryFraction >= 0.999f) {
+                if (bucket.disabled) {
+                    tvRecoveryRatio.setText("Inaktiv");
+                    tvRecoveryRatio.setTextColor(0xFF94A3B8);
+                } else if (recoveryFraction >= 0.999f) {
                     tvRecoveryRatio.setText(AppI18n.getFullReady());
                     tvRecoveryRatio.setTextColor(0xFF10B981);
                 } else {
@@ -1393,15 +1460,16 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         // 2. Circular Ring & Metrics
         CircularProgressView cpRing = view.findViewById(R.id.cpDetailRing);
-        cpRing.setProgress(bucket.remainingFraction);
+        float remFraction = bucket.getRemainingFraction();
+        cpRing.setProgress(remFraction);
 
         TextView tvCapStatus = view.findViewById(R.id.tvDetailCapacityStatus);
-        int remPct = Math.round(bucket.remainingFraction * 100f);
+        int remPct = Math.round(remFraction * 100f);
         tvCapStatus.setText(AppI18n.getDetailCapacity(remPct));
 
         TextView tvCountdown = view.findViewById(R.id.tvDetailResetCountdown);
         tvCountdown.setText(bucket.formatCountdown());
-        tvCountdown.setTextColor(bucket.remainingFraction > 0.5f ? 0xFF10B981 : (bucket.remainingFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444));
+        tvCountdown.setTextColor(bucket.disabled ? 0xFFEF4444 : (remFraction > 0.5f ? 0xFF10B981 : (remFraction > 0.15f ? 0xFFF59E0B : 0xFFEF4444)));
 
         TextView tvExactDate = view.findViewById(R.id.tvDetailExactResetDate);
         tvExactDate.setText(bucket.getFormattedResetDateTime());
@@ -1711,7 +1779,24 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         btnSave.setOnClickListener(holder);
         btnCancel.setOnClickListener(holder);
 
+        Button btnCheckUpdates = dialogView.findViewById(R.id.btnCheckUpdates);
+        if (btnCheckUpdates != null) {
+            btnCheckUpdates.setOnClickListener(this);
+        }
+
         dialog.show();
+    }
+
+    public void onCheckUpdatesClicked() {
+        OtaUpdateManager.getInstance().checkAppUpdate(this, true);
+        OtaUpdateManager.getInstance().checkWatchFirmware(this);
+    }
+
+    @Override
+    public void onWatchUpdateResult(boolean updateAvailable, String latestTag, String downloadUrl) {
+        if (updateAvailable) {
+            mainHandler.post(() -> Toast.makeText(MainActivity.this, "WatchOS Ultra Firmware " + latestTag + " auf GitHub verfügbar!", Toast.LENGTH_LONG).show());
+        }
     }
 
     private int dp(int value) {

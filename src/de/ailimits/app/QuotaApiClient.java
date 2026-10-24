@@ -36,7 +36,7 @@ public class QuotaApiClient {
         public void run() {
             try {
                 String endpoint = "http://" + host + ":" + port + "/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary";
-                android.util.Log.d("AILimits", "Requesting endpoint: " + endpoint);
+                android.util.Log.d("AILimits", "Requesting endpoint: " + endpoint + ", CSRF token: [" + (csrfToken != null ? csrfToken : "null") + "]");
                 URL url = new URL(endpoint);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -113,9 +113,17 @@ public class QuotaApiClient {
                             bucket.displayName = bObj.optString("displayName", "Limit");
                             bucket.description = bObj.optString("description", "");
                             bucket.window = bObj.optString("window", "5h");
-                            bucket.remainingFraction = (float) bObj.optDouble("remainingFraction", 1.0);
+                            bucket.disabled = bObj.optBoolean("disabled", false);
+                            if (bucket.disabled) {
+                                bucket.remainingFraction = 0.0f;
+                            } else {
+                                bucket.remainingFraction = (float) bObj.optDouble("remainingFraction", 1.0);
+                            }
                             bucket.rawResetTime = bObj.optString("resetTime", "");
                             bucket.resetTimeMillis = QuotaBucket.parseIsoTime(bucket.rawResetTime);
+                            if (!bucket.disabled && bucket.resetTimeMillis > 0 && System.currentTimeMillis() >= bucket.resetTimeMillis) {
+                                bucket.remainingFraction = 1.0f;
+                            }
                             bucket.groupName = groupName;
 
                             group.buckets.add(bucket);

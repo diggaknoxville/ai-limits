@@ -40,8 +40,10 @@ public class ClaudeDirectClient {
         @Override
         public void run() {
             SharedPreferences sp = context.getSharedPreferences("ai_limits_config", Context.MODE_PRIVATE);
-            String accessToken = sp.getString("claude_access_token", MainActivity.DEFAULT_CLAUDE_ACCESS);
-            String refreshToken = sp.getString("claude_refresh_token", MainActivity.DEFAULT_CLAUDE_REFRESH);
+            String accessToken = sp.getString("claude_access_token", "");
+            if (accessToken.isEmpty()) accessToken = MainActivity.DEFAULT_CLAUDE_ACCESS;
+            String refreshToken = sp.getString("claude_refresh_token", "");
+            if (refreshToken.isEmpty()) refreshToken = MainActivity.DEFAULT_CLAUDE_REFRESH;
 
             if (accessToken.isEmpty() && refreshToken.isEmpty()) {
                 callback.onClaudeError("Kein Claude Token hinterlegt");
@@ -141,8 +143,8 @@ public class ClaudeDirectClient {
                 sp.edit().putString("last_claude_usage_json", sb.toString()).apply();
                 return new FetchResult(code, new JSONObject(sb.toString()));
             } else if (code == 429) {
-                rateLimitedUntil = System.currentTimeMillis() + (60 * 1000); // 60s cooldown
-                Log.w(TAG, "429 Rate limited. Cooling down 60s.");
+                rateLimitedUntil = System.currentTimeMillis() + (300 * 1000); // 5m cooldown
+                Log.w(TAG, "429 Rate limited. Cooling down 5m.");
                 return new FetchResult(code, null);
             } else {
                 return new FetchResult(code, null);
@@ -226,6 +228,9 @@ public class ClaudeDirectClient {
             b5h.remainingFraction = (float) Math.max(0.0, Math.min(1.0, (100.0 - util) / 100.0));
             b5h.rawResetTime = resetsAt;
             b5h.resetTimeMillis = QuotaBucket.parseIsoTime(resetsAt);
+            if (b5h.resetTimeMillis > 0 && System.currentTimeMillis() >= b5h.resetTimeMillis) {
+                b5h.remainingFraction = 1.0f;
+            }
             b5h.groupName = group.displayName;
             b5h.description = String.format(java.util.Locale.US, "%.0f%% used (%.0f%% remaining)", util, (100.0 - util));
 
@@ -245,6 +250,9 @@ public class ClaudeDirectClient {
             b7d.remainingFraction = (float) Math.max(0.0, Math.min(1.0, (100.0 - util) / 100.0));
             b7d.rawResetTime = resetsAt;
             b7d.resetTimeMillis = QuotaBucket.parseIsoTime(resetsAt);
+            if (b7d.resetTimeMillis > 0 && System.currentTimeMillis() >= b7d.resetTimeMillis) {
+                b7d.remainingFraction = 1.0f;
+            }
             b7d.groupName = group.displayName;
             b7d.description = String.format(java.util.Locale.US, "%.0f%% used (%.0f%% remaining)", util, (100.0 - util));
 

@@ -46,7 +46,7 @@ public class QuotaWidgetProvider extends AppWidgetProvider {
                 JSONObject fiveH = obj.optJSONObject("five_hour");
                 if (fiveH != null) {
                     double util = fiveH.optDouble("utilization", 0.0);
-                    int free = (int) Math.round(100.0 - util);
+                    int free = (int) Math.round(util);
                     views.setTextViewText(R.id.tvWidgetClaudeValue, free + "% frei");
                     String resetIso = fiveH.optString("resets_at", "");
                     long ms = QuotaBucket.parseIsoTime(resetIso);

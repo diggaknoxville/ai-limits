@@ -11,6 +11,7 @@ import android.view.View;
 public class CircularProgressView extends View {
 
     private float progress = 0f; // 0.0 to 1.0
+    private boolean showUsed = false;
     private Paint trackPaint;
     private Paint progressPaint;
     private Paint textPaint;
@@ -58,6 +59,11 @@ public class CircularProgressView extends View {
         invalidate();
     }
 
+    public void setShowUsed(boolean showUsed) {
+        this.showUsed = showUsed;
+        invalidate();
+    }
+
     public float getProgress() {
         return progress;
     }
@@ -89,7 +95,7 @@ public class CircularProgressView extends View {
         // Draw background circle track
         canvas.drawOval(arcBounds, trackPaint);
 
-        // Select color based on quota percentage
+        // Select color based on quota percentage (remaining basis)
         if (progress > 0.50f) {
             progressPaint.setColor(greenColor);
         } else if (progress > 0.15f) {
@@ -99,13 +105,14 @@ public class CircularProgressView extends View {
         }
 
         // Draw active arc from -90 degrees (top)
-        float sweepAngle = progress * 360f;
+        float drawFraction = showUsed ? (1.0f - progress) : progress;
+        float sweepAngle = drawFraction * 360f;
         if (sweepAngle > 0.5f) {
             canvas.drawArc(arcBounds, -90f, sweepAngle, false, progressPaint);
         }
 
         // Draw percentage text in center
-        int percent = Math.round(progress * 100f);
+        int percent = Math.round(drawFraction * 100f);
         textPaint.setTextSize(width * 0.28f);
         float textY = (height / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f);
         canvas.drawText(percent + "%", width / 2f, textY, textPaint);

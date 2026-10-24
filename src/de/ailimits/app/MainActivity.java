@@ -81,6 +81,8 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
     // View Mode Switcher
     private Button btnViewHorizon;
     private Button btnViewProvider;
+    private Button btnToggleUsage;
+    private boolean showUsedMode = false;
     private String viewMode = "HORIZON"; // Default to Horizon / Time-window first
 
     // Freie Filter Chips
@@ -547,6 +549,9 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         btnViewHorizon = findViewById(R.id.btnViewHorizon);
         btnViewProvider = findViewById(R.id.btnViewProvider);
+        btnToggleUsage = findViewById(R.id.btnToggleUsage);
+        showUsedMode = prefs.getBoolean("show_used_mode", false);
+        updateToggleUsageButton();
 
         chipFilterAll = findViewById(R.id.chipFilterAll);
         chipFilterWeek = findViewById(R.id.chipFilterWeek);
@@ -565,6 +570,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         btnViewHorizon.setOnClickListener(this);
         btnViewProvider.setOnClickListener(this);
+        if (btnToggleUsage != null) btnToggleUsage.setOnClickListener(this);
 
         chipFilterAll.setOnClickListener(this);
         chipFilterWeek.setOnClickListener(this);
@@ -674,6 +680,11 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             prefs.edit().putString(KEY_VIEW_MODE, viewMode).apply();
             updateViewModeButtons();
             rebuildCombinedUi();
+        } else if (id == R.id.btnToggleUsage) {
+            showUsedMode = !showUsedMode;
+            prefs.edit().putBoolean("show_used_mode", showUsedMode).apply();
+            updateToggleUsageButton();
+            rebuildCombinedUi();
         } else if (id == R.id.chipFilterAll) {
             selectedFilter = "ALL";
             updateFilterChipStyles();
@@ -712,6 +723,18 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
         btnViewProvider.setBackgroundResource(!isHorizon ? R.drawable.button_background : R.drawable.button_secondary_background);
         btnViewProvider.setTextColor(!isHorizon ? 0xFFFFFFFF : 0xFF94A3B8);
+        updateToggleUsageButton();
+    }
+
+    private void updateToggleUsageButton() {
+        if (btnToggleUsage == null) return;
+        if (showUsedMode) {
+            btnToggleUsage.setText("📈 Verbraucht %");
+            btnToggleUsage.setTextColor(0xFFF59E0B);
+        } else {
+            btnToggleUsage.setText("📊 Rest %");
+            btnToggleUsage.setTextColor(0xFF10B981);
+        }
     }
 
     private void updateFilterChipStyles() {
@@ -818,6 +841,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
         for (TickerItem item : tickerItems) {
             if (item.bucket != null) {
                 if (item.progressView != null) {
+                    item.progressView.setShowUsed(showUsedMode);
                     item.progressView.setProgress(item.bucket.getRemainingFraction());
                 }
                 if (item.tvCountdown != null) {
@@ -1240,6 +1264,7 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
                 LinearLayout.LayoutParams cpLp = new LinearLayout.LayoutParams(size, size);
                 cpLp.rightMargin = dp(10);
                 cp.setLayoutParams(cpLp);
+                cp.setShowUsed(showUsedMode);
                 cp.setProgress(bucket.getRemainingFraction());
                 topRow.addView(cp);
 

@@ -225,14 +225,14 @@ public class ClaudeDirectClient {
             b5h.bucketId = "claude_pro_5h";
             b5h.displayName = "Claude Pro 5-Hour Limit";
             b5h.window = "5h";
-            b5h.remainingFraction = (float) Math.max(0.0, Math.min(1.0, util / 100.0));
+            b5h.remainingFraction = (float) Math.max(0.0, Math.min(1.0, (100.0 - util) / 100.0));
             b5h.rawResetTime = resetsAt;
             b5h.resetTimeMillis = QuotaBucket.parseIsoTime(resetsAt);
             if (b5h.resetTimeMillis > 0 && System.currentTimeMillis() >= b5h.resetTimeMillis) {
                 b5h.remainingFraction = 1.0f;
             }
             b5h.groupName = group.displayName;
-            b5h.description = String.format(java.util.Locale.US, "%.0f%% remaining", util);
+            b5h.description = String.format(java.util.Locale.US, "%.0f%% verbleibend (%.0f%% genutzt)", 100.0 - util, util);
 
             group.buckets.add(b5h);
         }
@@ -247,14 +247,14 @@ public class ClaudeDirectClient {
             b7d.bucketId = "claude_pro_7d";
             b7d.displayName = "Claude Pro Weekly Limit (7-Day)";
             b7d.window = "weekly";
-            b7d.remainingFraction = (float) Math.max(0.0, Math.min(1.0, util / 100.0));
+            b7d.remainingFraction = (float) Math.max(0.0, Math.min(1.0, (100.0 - util) / 100.0));
             b7d.rawResetTime = resetsAt;
             b7d.resetTimeMillis = QuotaBucket.parseIsoTime(resetsAt);
             if (b7d.resetTimeMillis > 0 && System.currentTimeMillis() >= b7d.resetTimeMillis) {
                 b7d.remainingFraction = 1.0f;
             }
             b7d.groupName = group.displayName;
-            b7d.description = String.format(java.util.Locale.US, "%.0f%% remaining", util);
+            b7d.description = String.format(java.util.Locale.US, "%.0f%% verbleibend (%.0f%% genutzt)", 100.0 - util, util);
 
             group.buckets.add(b7d);
         }

@@ -119,6 +119,23 @@ public class WatchBleSyncManager {
         startScan(context, adapter);
     }
 
+    public void autoReconnect(Context context) {
+        if (connectedGatt != null) return;
+        BluetoothManager bm = (BluetoothManager) context.getSystemService(Context.BLUETOOTH_SERVICE);
+        if (bm == null) return;
+        BluetoothAdapter adapter = bm.getAdapter();
+        if (adapter == null || !adapter.isEnabled()) return;
+        try {
+            for (BluetoothDevice device : adapter.getBondedDevices()) {
+                if (WATCH_NAME.equalsIgnoreCase(device.getName())) {
+                    connectToDevice(context, device);
+                    return;
+                }
+            }
+        } catch (SecurityException ignored) {}
+        startScan(context, adapter);
+    }
+
     private void startScan(Context context, BluetoothAdapter adapter) {
         BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) {
@@ -234,9 +251,11 @@ public class WatchBleSyncManager {
                     gatt.discoverServices();
                 } catch (SecurityException ignored) {}
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.d(TAG, "WatchOS Ultra getrennt.");
-                gatt.close();
+                Log.d(TAG, "WatchOS Ultra getrennt. Halte Wiederverbindung aktiv...");
+                try { gatt.close(); } catch (Exception ignored) {}
                 manager.connectedGatt = null;
+                // Auto-reconnect in 2.5 seconds to keep connection persistent
+                manager.handler.postDelayed(() -> manager.autoReconnect(context), 2500);
             }
         }
 
@@ -246,37 +265,51 @@ public class WatchBleSyncManager {
                 BluetoothGattService service = gatt.getService(SERVICE_AI_LIMITS);
                 if (service != null) {
                     BluetoothGattCharacteristic charStatus = service.getCharacteristic(CHAR_STATUS);
-                    BluetoothGattCharacteristic charData = service.getCharacteristic(CHAR_DATA);
 
-                    // Subscribe to status notifications (receives CMD:MEDIA:* and CMD:CAL_SYNC from watch)
+                    // Step 1: Subscribe to status notifications asynchronously
                     if (charStatus != null) {
                         try {
                             gatt.setCharacteristicNotification(charStatus, true);
                             BluetoothGattDescriptor desc = charStatus.getDescriptor(CCCD_UUID);
                             if (desc != null) {
                                 desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                                gatt.writeDescriptor(desc);
+                                gatt.writeDescriptor(desc); // Hands off to onDescriptorWrite!
+                                return;
                             }
                         } catch (SecurityException ignored) {}
                     }
-
-                    // Write pending Quota payload
-                    if (charData != null && manager.pendingPayload != null) {
-                        try {
-                            charData.setValue(manager.pendingPayload);
-                            charData.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-                            boolean ok = gatt.writeCharacteristic(charData);
-                            Log.d(TAG, "Datenübertragung gestartet: " + ok);
-                        } catch (SecurityException ignored) {}
-                    }
-
-                    // Also immediately push upcoming Google Calendar events on connect!
-                    manager.handler.postDelayed(() -> manager.syncCalendarToWatch(context, gatt), 600);
+                    // Fallback if no descriptor write needed
+                    sendPayloadAndCalendar(gatt);
                     return;
                 }
             }
             manager.disconnectGatt(gatt);
             manager.notifyError("AI Limits Service auf der Uhr nicht gefunden");
+        }
+
+        @Override
+        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            Log.d(TAG, "CCCD Notifications erfolgreich aktiviert (status=" + status + ")");
+            // Step 2: Now that descriptor write completed, safely transmit payload and calendar without collision!
+            sendPayloadAndCalendar(gatt);
+        }
+
+        private void sendPayloadAndCalendar(BluetoothGatt gatt) {
+            BluetoothGattService service = gatt.getService(SERVICE_AI_LIMITS);
+            if (service == null) return;
+            BluetoothGattCharacteristic charData = service.getCharacteristic(CHAR_DATA);
+
+            if (charData != null && manager.pendingPayload != null) {
+                try {
+                    charData.setValue(manager.pendingPayload);
+                    charData.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                    boolean ok = gatt.writeCharacteristic(charData);
+                    Log.d(TAG, "Datenübertragung gestartet: " + ok);
+                } catch (SecurityException ignored) {}
+            }
+
+            // Step 3: Push Google Calendar events after a short delay
+            manager.handler.postDelayed(() -> manager.syncCalendarToWatch(context, gatt), 500);
         }
 
         @Override

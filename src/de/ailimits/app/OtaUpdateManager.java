@@ -29,7 +29,7 @@ public class OtaUpdateManager {
     private static final String TAG = "OtaUpdateManager";
     public static final String APP_REPO = "diggaknoxville/ai-limits";
     public static final String WATCH_REPO = "diggaknoxville/WatchOS-Ultra";
-    public static final String CURRENT_APP_VERSION = "1.2.0";
+    public static final String CURRENT_APP_VERSION = "1.5.0";
 
     private static OtaUpdateManager instance;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();

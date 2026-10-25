@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
@@ -13,14 +14,24 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
+import android.content.ContentUris;
 import android.content.Context;
+import android.database.Cursor;
+import android.media.AudioManager;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
+import android.provider.CalendarContract;
 import android.util.Log;
+import android.view.KeyEvent;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -30,12 +41,15 @@ public class WatchBleSyncManager {
 
     public static final String WATCH_NAME = "WatchOS Ultra";
     public static final UUID SERVICE_AI_LIMITS = UUID.fromString("0000a100-0000-1000-8000-00805f9b34fb");
-    public static final UUID CHAR_DATA = UUID.fromString("0000a101-0000-1000-8000-00805f9b34fb");
+    public static final UUID CHAR_DATA        = UUID.fromString("0000a101-0000-1000-8000-00805f9b34fb");
+    public static final UUID CHAR_STATUS      = UUID.fromString("0000a102-0000-1000-8000-00805f9b34fb");
+    public static final UUID CCCD_UUID        = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
     private static WatchBleSyncManager instance;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     private BluetoothGatt connectedGatt = null;
+    private Context appContext = null;
     private boolean isScanning = false;
     private byte[] pendingPayload = null;
     private SyncCallback activeCallback = null;
@@ -57,6 +71,7 @@ public class WatchBleSyncManager {
     private WatchBleSyncManager() {}
 
     public void syncBucketsToWatch(Context context, List<QuotaBucket> buckets, SyncCallback callback) {
+        this.appContext = context.getApplicationContext();
         this.activeCallback = callback;
         this.pendingPayload = buildBinaryPayload(buckets);
 
@@ -70,6 +85,23 @@ public class WatchBleSyncManager {
         if (adapter == null || !adapter.isEnabled()) {
             notifyError("Bluetooth ist deaktiviert");
             return;
+        }
+
+        // If already connected to WatchOS Ultra GATT, transmit immediately
+        if (connectedGatt != null) {
+            BluetoothGattService service = connectedGatt.getService(SERVICE_AI_LIMITS);
+            if (service != null) {
+                BluetoothGattCharacteristic charData = service.getCharacteristic(CHAR_DATA);
+                if (charData != null && pendingPayload != null) {
+                    try {
+                        charData.setValue(pendingPayload);
+                        charData.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                        connectedGatt.writeCharacteristic(charData);
+                        Log.d(TAG, "Direkt ueber bestehende GATT Verbindung gesendet");
+                        return;
+                    } catch (SecurityException ignored) {}
+                }
+            }
         }
 
         // Check bonded/paired devices first
@@ -179,7 +211,7 @@ public class WatchBleSyncManager {
 
     private void connectToDevice(Context context, BluetoothDevice device) {
         try {
-            connectedGatt = device.connectGatt(context, false, new WatchGattCallback(this));
+            connectedGatt = device.connectGatt(context, false, new WatchGattCallback(this, context));
         } catch (SecurityException e) {
             notifyError("GATT Verbindung fehlgeschlagen: " + e.getMessage());
         }
@@ -187,9 +219,11 @@ public class WatchBleSyncManager {
 
     private static class WatchGattCallback extends BluetoothGattCallback {
         private final WatchBleSyncManager manager;
+        private final Context context;
 
-        WatchGattCallback(WatchBleSyncManager manager) {
+        WatchGattCallback(WatchBleSyncManager manager, Context context) {
             this.manager = manager;
+            this.context = context;
         }
 
         @Override
@@ -211,16 +245,34 @@ public class WatchBleSyncManager {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 BluetoothGattService service = gatt.getService(SERVICE_AI_LIMITS);
                 if (service != null) {
+                    BluetoothGattCharacteristic charStatus = service.getCharacteristic(CHAR_STATUS);
                     BluetoothGattCharacteristic charData = service.getCharacteristic(CHAR_DATA);
+
+                    // Subscribe to status notifications (receives CMD:MEDIA:* and CMD:CAL_SYNC from watch)
+                    if (charStatus != null) {
+                        try {
+                            gatt.setCharacteristicNotification(charStatus, true);
+                            BluetoothGattDescriptor desc = charStatus.getDescriptor(CCCD_UUID);
+                            if (desc != null) {
+                                desc.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                                gatt.writeDescriptor(desc);
+                            }
+                        } catch (SecurityException ignored) {}
+                    }
+
+                    // Write pending Quota payload
                     if (charData != null && manager.pendingPayload != null) {
                         try {
                             charData.setValue(manager.pendingPayload);
                             charData.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
                             boolean ok = gatt.writeCharacteristic(charData);
                             Log.d(TAG, "Datenübertragung gestartet: " + ok);
-                            return;
                         } catch (SecurityException ignored) {}
                     }
+
+                    // Also immediately push upcoming Google Calendar events on connect!
+                    manager.handler.postDelayed(() -> manager.syncCalendarToWatch(context, gatt), 600);
+                    return;
                 }
             }
             manager.disconnectGatt(gatt);
@@ -229,14 +281,128 @@ public class WatchBleSyncManager {
 
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            manager.disconnectGatt(gatt);
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.d(TAG, "Quota-Daten erfolgreich an WatchOS Ultra übertragen!");
+                Log.d(TAG, "Daten erfolgreich an WatchOS Ultra übertragen!");
                 manager.notifySuccess();
             } else {
                 Log.e(TAG, "Schreibfehler auf Charakteristik: " + status);
                 manager.notifyError("Schreibfehler: " + status);
             }
+        }
+
+        @Override
+        public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
+            byte[] val = characteristic.getValue();
+            if (val == null || val.length == 0) return;
+            String msg = new String(val, StandardCharsets.UTF_8).trim();
+            Log.d(TAG, "Kommando von WatchOS Ultra empfangen: " + msg);
+
+            if (msg.startsWith("CMD:MEDIA:")) {
+                manager.handleMediaCommand(context, msg);
+            } else if ("CMD:CAL_SYNC".equals(msg)) {
+                manager.syncCalendarToWatch(context, gatt);
+            }
+        }
+    }
+
+    private void handleMediaCommand(Context context, String cmd) {
+        AudioManager am = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+
+        if ("CMD:MEDIA:PLAY_PAUSE".equals(cmd)) {
+            dispatchMediaKey(am, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
+        } else if ("CMD:MEDIA:NEXT".equals(cmd)) {
+            dispatchMediaKey(am, KeyEvent.KEYCODE_MEDIA_NEXT);
+        } else if ("CMD:MEDIA:PREV".equals(cmd)) {
+            dispatchMediaKey(am, KeyEvent.KEYCODE_MEDIA_PREVIOUS);
+        } else if ("CMD:MEDIA:VOL_UP".equals(cmd)) {
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI);
+        } else if ("CMD:MEDIA:VOL_DOWN".equals(cmd)) {
+            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI);
+        }
+    }
+
+    private static void dispatchMediaKey(AudioManager am, int keyCode) {
+        try {
+            am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, keyCode));
+            am.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, keyCode));
+        } catch (Exception e) {
+            Log.e(TAG, "Fehler beim Senden von MediaKeyEvent: " + e.getMessage());
+        }
+    }
+
+    public void syncCalendarToWatch(Context context, BluetoothGatt gatt) {
+        if (gatt == null) return;
+        try {
+            BluetoothGattService service = gatt.getService(SERVICE_AI_LIMITS);
+            if (service == null) return;
+            BluetoothGattCharacteristic charData = service.getCharacteristic(CHAR_DATA);
+            if (charData == null) return;
+
+            String calJson = queryUpcomingCalendarJson(context, 8);
+            if (calJson != null && calJson.length() > 0) {
+                charData.setValue(calJson.getBytes(StandardCharsets.UTF_8));
+                charData.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+                gatt.writeCharacteristic(charData);
+                Log.d(TAG, "Google Kalender JSON an Uhr gesendet: " + calJson);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Fehler beim Kalender-Sync: " + e.getMessage());
+        }
+    }
+
+    public static String queryUpcomingCalendarJson(Context context, int maxEvents) {
+        try {
+            long now = System.currentTimeMillis();
+            long end = now + 7L * 86400000L; // Next 7 days
+
+            Uri.Builder builder = CalendarContract.Instances.CONTENT_URI.buildUpon();
+            ContentUris.appendId(builder, now - 1800000L);
+            ContentUris.appendId(builder, end);
+
+            String[] projection = new String[]{
+                    CalendarContract.Instances.TITLE,
+                    CalendarContract.Instances.BEGIN,
+                    CalendarContract.Instances.END,
+                    CalendarContract.Instances.EVENT_LOCATION,
+                    CalendarContract.Instances.ALL_DAY
+            };
+
+            Cursor cursor = context.getContentResolver().query(
+                    builder.build(), projection, null, null, CalendarContract.Instances.BEGIN + " ASC"
+            );
+
+            if (cursor == null) return "{\"cal\":[]}";
+
+            JSONArray arr = new JSONArray();
+            int count = 0;
+            while (cursor.moveToNext() && count < maxEvents) {
+                String title = cursor.getString(0);
+                long begin = cursor.getLong(1);
+                long finish = cursor.getLong(2);
+                String loc = cursor.getString(3);
+                int allDay = cursor.getInt(4);
+
+                JSONObject ev = new JSONObject();
+                ev.put("t", title != null ? title : "Termin");
+                ev.put("s", begin / 1000L);
+                ev.put("e", finish / 1000L);
+                ev.put("l", loc != null ? loc : "");
+                ev.put("a", allDay);
+                arr.put(ev);
+                count++;
+            }
+            cursor.close();
+
+            JSONObject root = new JSONObject();
+            root.put("cal", arr);
+            return root.toString();
+        } catch (SecurityException se) {
+            Log.w(TAG, "READ_CALENDAR Berechtigung noch nicht erteilt");
+            return "{\"cal\":[]}";
+        } catch (Exception e) {
+            Log.e(TAG, "Kalenderabfrage Fehler: " + e.getMessage());
+            return "{\"cal\":[]}";
         }
     }
 

@@ -603,6 +603,10 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
             }
         }
 
+        if (checkSelfPermission("android.permission.READ_CALENDAR") != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.READ_CALENDAR"}, 103);
+        }
+
         // Silent background update check
         OtaUpdateManager.getInstance().checkAppUpdate(this, false);
 

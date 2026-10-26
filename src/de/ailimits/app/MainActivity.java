@@ -1823,8 +1823,17 @@ public class MainActivity extends Activity implements View.OnClickListener, Runn
 
     @Override
     public void onWatchUpdateResult(boolean updateAvailable, String latestTag, String downloadUrl) {
-        if (updateAvailable) {
-            mainHandler.post(() -> Toast.makeText(MainActivity.this, "WatchOS Ultra Firmware " + latestTag + " auf GitHub verfügbar!", Toast.LENGTH_LONG).show());
+        if (updateAvailable && downloadUrl != null) {
+            mainHandler.post(() -> {
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("WatchOS Ultra Update")
+                    .setMessage("Neues Firmware-Release " + latestTag + " auf GitHub gefunden!\n\nMöchten Sie das Update über den WatchOS Web-Hotspot übertragen?")
+                    .setPositiveButton("Anleitung & Übertragen", (dialog, which) -> {
+                        Toast.makeText(MainActivity.this, "Verbinden Sie das Smartphone mit dem WatchOS-Ultra WLAN und öffnen Sie 192.168.4.1 für 1-Klick OTA.", Toast.LENGTH_LONG).show();
+                    })
+                    .setNegativeButton("Später", null)
+                    .show();
+            });
         }
     }
 
